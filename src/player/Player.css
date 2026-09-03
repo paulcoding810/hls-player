@@ -1,0 +1,13 @@
+/* Playback UI is our own (see src/components/Controls.jsx); video.js only
+   provides the engine, so its skin is reduced to sizing. */
+.player-shell .video-js {
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  font-family: inherit;
+}
+
+.player-shell .vjs-loading-spinner {
+  border-color: var(--color-primary);
+  border-top-color: var(--color-line-strong);
+}

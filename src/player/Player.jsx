@@ -1,0 +1,708 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import videojs from 'video.js'
+import 'video.js/dist/video-js.css'
+
+import Controls from '@components/Controls'
+import EpisodeList from '@components/EpisodeList'
+import MovieFields from '@components/MovieFields'
+import ResumeDialog from '@components/ResumeDialog'
+import {
+  AlertIcon,
+  EditIcon,
+  LibraryIcon,
+  NextIcon,
+  PlaylistIcon,
+  PlayIcon,
+} from '@components/icons'
+import {
+  activeGhostClass,
+  dangerBannerClass,
+  ghostButtonClass,
+  overlayButtonClass,
+  overlayPlayButtonClass,
+  warnBannerClass,
+} from '@components/ui'
+import { GALLERY_PATH, HLS_MIME, MESSAGE } from '@/helper/constants'
+import {
+  EMPTY_LIBRARY,
+  findEpisode,
+  findMovie,
+  getLibrary,
+  resolveConfig,
+  resumeEpisodeId,
+  setEpisodes,
+  setLastPlayed,
+  updateMovie,
+} from '@/helper/library'
+import { clearProgress, getProgress, saveProgress } from '@/helper/progress'
+import { DEFAULT_SETTINGS, getSettings, sanitizeSettings, saveSettings } from '@/helper/settings'
+import api from '@/utils/api'
+import { hasHostPermission, requestHostPermission } from '@/utils/browser'
+import './Player.css'
+
+const VIDEO_JS_OPTIONS = {
+  // The playback UI is Controls.jsx — video.js is only the HLS engine here.
+  controls: false,
+  bigPlayButton: false,
+  errorDisplay: false,
+  preload: 'auto',
+  fill: true,
+  html5: {
+    // Always play through videojs-http-streaming so the Referer override
+    // applies to every playlist and segment request.
+    vhs: { overrideNative: true },
+    nativeAudioTracks: false,
+    nativeVideoTracks: false,
+  },
+}
+
+const IDLE_DELAY = 2500
+
+/** How often the playback position is written while watching. */
+const PROGRESS_INTERVAL = 5
+
+/** Header rules are scoped to this tab by the background script. */
+async function applyHeaders(referer) {
+  const response = await api.runtime.sendMessage({
+    type: MESSAGE.APPLY_HEADERS,
+    headers: { referer },
+  })
+  if (!response?.ok) {
+    throw new Error(response?.error || 'Could not apply the Referer header.')
+  }
+}
+
+export default function Player() {
+  const containerRef = useRef(null)
+  const stageRef = useRef(null)
+  const playerRef = useRef(null)
+  /** Movie config merged over the global settings, for the video callbacks. */
+  const configRef = useRef(resolveConfig(null, DEFAULT_SETTINGS))
+  const advanceRef = useRef(() => {})
+  const hasNextRef = useRef(false)
+  /** Guards the automatic outro jump against repeat `timeupdate` calls. */
+  const skippedRef = useRef(false)
+  const idleTimer = useRef(null)
+  const srcRef = useRef(null)
+  const savedAtRef = useRef(0)
+  /** Set while the resume prompt owns the starting position. */
+  const holdRef = useRef(false)
+
+  const [player, setPlayer] = useState(null)
+  const [playing, setPlaying] = useState(false)
+  const [pointerActive, setPointerActive] = useState(true)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [library, setLibrary] = useState(EMPTY_LIBRARY)
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
+  const [watching, setWatching] = useState(null)
+  const [ready, setReady] = useState(false)
+  const [error, setError] = useState('')
+  const [levels, setLevels] = useState([])
+  const [level, setLevel] = useState('auto')
+  /** `episodes`, `edit`, or null when the panel is closed. */
+  const [panel, setPanel] = useState(null)
+  /** `intro`, `outro` or null — which skip button the position calls for. */
+  const [skip, setSkip] = useState(null)
+  const [granted, setGranted] = useState(true)
+  const [resume, setResume] = useState(null)
+
+  const movie = findMovie(library, watching?.movieId)
+  const episode = findEpisode(movie, watching?.episodeId)
+  const episodeIndex = movie?.episodes.findIndex((item) => item.id === episode?.id) ?? -1
+  // Inputs keep their raw text; playback reads sanitized numbers.
+  const config = resolveConfig(movie, sanitizeSettings(settings))
+
+  useEffect(() => {
+    configRef.current = config
+  }, [config])
+
+  useEffect(() => {
+    // video.js replaces the element it is handed, so it gets one React does
+    // not own — otherwise disposing on unmount fights with React's cleanup.
+    const element = document.createElement('video-js')
+    element.setAttribute('playsinline', '')
+    containerRef.current.appendChild(element)
+
+    const instance = videojs(element, VIDEO_JS_OPTIONS)
+    playerRef.current = instance
+    setPlayer(instance)
+
+    instance.on('play', () => setPlaying(true))
+    instance.on('pause', () => {
+      setPlaying(false)
+      // Keep the stored position fresh when someone stops mid-episode.
+      if (srcRef.current && !holdRef.current) {
+        saveProgress(srcRef.current, instance.currentTime(), instance.duration())
+      }
+    })
+    instance.on('error', () => setError(instance.error()?.message || 'Playback failed.'))
+
+    instance.on('loadedmetadata', () => {
+      setError('')
+      setLevels(readLevels(instance))
+
+      const { autoSkip, skipLeading, playbackRate } = configRef.current
+      instance.playbackRate(playbackRate)
+      const duration = instance.duration()
+      if (
+        autoSkip &&
+        !holdRef.current &&
+        skipLeading > 0 &&
+        Number.isFinite(duration) &&
+        skipLeading < duration
+      ) {
+        instance.currentTime(skipLeading)
+      }
+    })
+
+    instance.on('timeupdate', () => {
+      const time = instance.currentTime()
+      if (srcRef.current && Math.abs(time - savedAtRef.current) >= PROGRESS_INTERVAL) {
+        savedAtRef.current = time
+        saveProgress(srcRef.current, time, instance.duration())
+      }
+
+      const window = skipAt(time, instance.duration(), configRef.current)
+      if (!configRef.current.autoSkip) {
+        setSkip(window)
+        return
+      }
+
+      setSkip(null)
+      // Nothing to jump to on the last episode, so it plays out instead.
+      if (window === 'outro' && hasNextRef.current && !skippedRef.current) {
+        skippedRef.current = true
+        advanceRef.current()
+      }
+    })
+
+    instance.on('ended', () => {
+      if (srcRef.current) clearProgress(srcRef.current)
+      advanceRef.current()
+    })
+
+    return () => {
+      instance.dispose()
+      playerRef.current = null
+      setPlayer(null)
+    }
+  }, [])
+
+  // Opening the page continues where it was left, or shows the library.
+  useEffect(() => {
+    ;(async () => {
+      const [storedSettings, storedLibrary, permission] = await Promise.all([
+        getSettings(),
+        getLibrary(),
+        hasHostPermission(),
+      ])
+      setSettings(storedSettings)
+      setLibrary(storedLibrary)
+      setGranted(permission)
+
+      const last = findMovie(storedLibrary, storedLibrary.lastPlayed?.movieId)
+      const episodeId = last
+        ? (findEpisode(last, storedLibrary.lastPlayed?.episodeId)?.id ?? resumeEpisodeId(last))
+        : null
+
+      if (!last || !episodeId) {
+        // `replace`, so Back does not bounce straight back here.
+        window.location.replace(GALLERY_PATH)
+        return
+      }
+
+      setWatching({ movieId: last.id, episodeId })
+      configRef.current = resolveConfig(last, storedSettings)
+      setReady(true)
+    })()
+  }, [])
+
+  /** Keeps this page in step with edits made on the options page. */
+  useEffect(() => {
+    const listener = (changes, area) => {
+      if (area !== 'local') return
+      const next = changes.settings?.newValue
+      if (!next || sameSettings(next, settings)) return
+      setSettings({ ...DEFAULT_SETTINGS, ...next })
+    }
+    api.storage.onChanged.addListener(listener)
+    return () => api.storage.onChanged.removeListener(listener)
+  }, [settings])
+
+  useEffect(() => {
+    const listener = () => setFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', listener)
+    return () => document.removeEventListener('fullscreenchange', listener)
+  }, [])
+
+  // Load whenever the episode changes.
+  useEffect(() => {
+    if (!ready || !episode) return
+    let cancelled = false
+
+    ;(async () => {
+      srcRef.current = episode.src
+      savedAtRef.current = 0
+      skippedRef.current = false
+      holdRef.current = false
+      setResume(null)
+      setSkip(null)
+      setError('')
+      setLevels([])
+      setLevel('auto')
+      try {
+        await applyHeaders(configRef.current.referer)
+      } catch (headerError) {
+        setError(headerError.message)
+        return
+      }
+      if (cancelled) return
+
+      const instance = playerRef.current
+      if (!instance) return
+
+      const stored = await getProgress(episode.src)
+      if (cancelled) return
+
+      const { autoplay, muted, playbackRate } = configRef.current
+      holdRef.current = Boolean(stored)
+      instance.src({ src: episode.src, type: HLS_MIME })
+      instance.muted(Boolean(muted))
+      instance.playbackRate(playbackRate)
+
+      if (stored) {
+        // Playback waits for the answer instead of starting at zero and jumping.
+        setResume(stored)
+      } else if (autoplay) {
+        // Autoplay is blocked without a gesture unless the stream is muted.
+        instance.play()?.catch(() => {})
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [ready, episode?.id, episode?.src, config.referer])
+
+  useEffect(() => {
+    document.title = episode ? `${episode.title} – ${movie.title}` : 'HLS Player'
+  }, [episode, movie?.title])
+
+  const play = useCallback(async (movieId, episodeId) => {
+    if (!episodeId) return
+    setWatching({ movieId, episodeId })
+    setLibrary(await setLastPlayed(movieId, episodeId))
+  }, [])
+
+  useEffect(() => {
+    if (!ready || !watching?.movieId || !movie || episode) return
+    // The episode being watched was edited away.
+    const fallback = resumeEpisodeId(movie)
+    if (fallback) play(movie.id, fallback)
+    else window.location.href = GALLERY_PATH
+  }, [ready, watching?.movieId, movie, episode, play])
+
+  const goToEpisode = useCallback(
+    (episodeId) => {
+      if (watching?.movieId) play(watching.movieId, episodeId)
+    },
+    [play, watching?.movieId],
+  )
+
+  useEffect(() => {
+    const next = movie?.episodes[episodeIndex + 1]
+    hasNextRef.current = Boolean(next)
+    advanceRef.current = () => {
+      if (next) goToEpisode(next.id)
+      else playerRef.current?.pause()
+    }
+  }, [movie, episodeIndex, goToEpisode])
+
+  /** Hides the controls while playback is left alone. */
+  const wake = useCallback(() => {
+    setPointerActive(true)
+    clearTimeout(idleTimer.current)
+    idleTimer.current = setTimeout(() => setPointerActive(false), IDLE_DELAY)
+  }, [])
+
+  useEffect(() => () => clearTimeout(idleTimer.current), [])
+
+  useEffect(() => {
+    if (playing) wake()
+  }, [playing, wake])
+
+  useEffect(() => {
+    if (!episode) playerRef.current?.pause()
+  }, [episode])
+
+  /** Seeking before metadata lands does not stick, so it waits when needed. */
+  const startAt = useCallback((time) => {
+    const instance = playerRef.current
+    if (!instance) return
+
+    const apply = () => {
+      instance.currentTime(time)
+      holdRef.current = false
+      savedAtRef.current = time
+      instance.play()?.catch(() => {})
+    }
+
+    if (instance.readyState() >= 1) apply()
+    else instance.one('loadedmetadata', apply)
+  }, [])
+
+  const handleResume = useCallback(() => {
+    const position = resume?.position ?? 0
+    setResume(null)
+    startAt(position)
+  }, [resume, startAt])
+
+  const handleRestart = useCallback(() => {
+    setResume(null)
+    if (srcRef.current) clearProgress(srcRef.current)
+    const { autoSkip, skipLeading } = configRef.current
+    startAt(autoSkip ? skipLeading || 0 : 0)
+  }, [startAt])
+
+  const togglePlay = useCallback(() => {
+    const instance = playerRef.current
+    if (!instance) return
+    if (instance.paused()) instance.play()?.catch(() => {})
+    else instance.pause()
+  }, [])
+
+  /** Navigating away kills the player, so the position is stored first. */
+  const goToLibrary = useCallback(async () => {
+    const instance = playerRef.current
+    if (instance && srcRef.current && !holdRef.current) {
+      instance.pause()
+      await saveProgress(srcRef.current, instance.currentTime(), instance.duration())
+    }
+    window.location.href = GALLERY_PATH
+  }, [])
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) document.exitFullscreen()
+    else stageRef.current?.requestFullscreen?.()
+  }, [])
+
+  const updateSettings = useCallback((patch) => {
+    setSettings((previous) => {
+      const next = { ...previous, ...patch }
+      saveSettings(next)
+      return next
+    })
+  }, [])
+
+  const saveMovie = async ({ episodes, ...patch }) => {
+    await updateMovie(movie.id, patch)
+    setLibrary(await setEpisodes(movie.id, episodes))
+    setPanel('episodes')
+  }
+
+  const skipIntro = useCallback(() => {
+    playerRef.current?.currentTime(configRef.current.skipLeading)
+    setSkip(null)
+  }, [])
+
+  const skipOutro = useCallback(() => advanceRef.current(), [])
+
+  const hasPrevious = episodeIndex > 0
+  const hasNext = episodeIndex > -1 && episodeIndex + 1 < (movie?.episodes.length ?? 0)
+  // On the last episode the outro leads nowhere, so it is not offered.
+  const skipAction = skip === 'outro' && !hasNext ? null : skip
+
+  // Keyboard shortcuts, unless a form control has focus.
+  useEffect(() => {
+    const listener = (event) => {
+      if (resume || panel === 'edit' || !episode) return
+      const target = event.target
+      if (target?.closest?.('input, textarea, select, [contenteditable]')) return
+
+      // Space is playback's, never a re-press of the button that was clicked
+      // last, so the focus it is holding is dropped. Enter still activates.
+      if (event.key === ' ') target?.blur?.()
+      else if (event.key === 'Enter' && target?.closest?.('button, a')) return
+
+      const instance = playerRef.current
+      if (!instance) return
+
+      const seek = (delta) => instance.currentTime(Math.max(0, instance.currentTime() + delta))
+      const setVolume = (delta) =>
+        instance.volume(Math.min(1, Math.max(0, instance.volume() + delta)))
+
+      const handlers = {
+        ' ': togglePlay,
+        k: togglePlay,
+        ArrowLeft: () => seek(-5),
+        ArrowRight: () => seek(5),
+        ArrowUp: () => setVolume(0.05),
+        ArrowDown: () => setVolume(-0.05),
+        m: () => instance.muted(!instance.muted()),
+        f: toggleFullscreen,
+        n: () => hasNext && goToEpisode(movie.episodes[episodeIndex + 1].id),
+        p: () => hasPrevious && goToEpisode(movie.episodes[episodeIndex - 1].id),
+      }
+
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
+      const handler = handlers[key]
+      if (!handler) return
+      event.preventDefault()
+      wake()
+      handler()
+    }
+
+    window.addEventListener('keydown', listener)
+    return () => window.removeEventListener('keydown', listener)
+  }, [
+    togglePlay,
+    toggleFullscreen,
+    goToEpisode,
+    wake,
+    hasNext,
+    hasPrevious,
+    movie,
+    episodeIndex,
+    resume,
+    panel,
+    episode,
+  ])
+
+  const handleLevelChange = (event) => {
+    const value = event.target.value
+    setLevel(value)
+    representationsOf(playerRef.current).forEach((representation) => {
+      representation.enabled(value === 'auto' || String(representation.id) === value)
+    })
+  }
+
+  const showControls = !playing || pointerActive
+  // The editor must not vanish mid-typing, so only the episode list fades.
+  const panelVisible = showControls || panel === 'edit'
+
+  return (
+    <>
+      <main className="player-shell bg-surface text-ink flex h-screen flex-col">
+        <header className="border-line flex items-center gap-3 border-b px-4 py-2">
+          <button
+            type="button"
+            onClick={goToLibrary}
+            className={ghostButtonClass}
+            title="Back to the library"
+          >
+            <LibraryIcon />
+            Library
+          </button>
+
+          <span className="truncate text-sm" title={episode?.src || ''}>
+            {movie?.title}
+            {episode && <span className="text-ink-faint"> · {episode.title}</span>}
+          </span>
+          {movie?.episodes.length > 1 && episodeIndex > -1 && (
+            <span className="text-ink-faint shrink-0 text-xs">
+              {episodeIndex + 1} / {movie.episodes.length}
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setPanel(panel ? null : 'episodes')}
+            className={`${ghostButtonClass} ml-auto ${panel ? activeGhostClass : ''}`}
+          >
+            <PlaylistIcon />
+            Episodes
+          </button>
+        </header>
+
+        {!granted && (
+          <button
+            type="button"
+            onClick={async () => setGranted(await requestHostPermission())}
+            className={`${warnBannerClass} border-line border-b`}
+          >
+            <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            Access to websites is not granted yet — click to allow it, otherwise streams cannot be
+            fetched.
+          </button>
+        )}
+
+        {error && (
+          <p className={`${dangerBannerClass} border-line border-b`}>
+            <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error} Streams that reject the request usually need a matching Referer.</span>
+          </p>
+        )}
+
+        <div
+          className="relative flex min-h-0 flex-1"
+          onPointerMove={wake}
+          onPointerLeave={() => setPointerActive(false)}
+        >
+          <div
+            ref={stageRef}
+            className={`relative min-w-0 flex-1 bg-black ${showControls ? '' : 'cursor-none'}`}
+          >
+            <div ref={containerRef} className="absolute inset-0" data-vjs-player />
+
+            {episode && (
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={togglePlay}
+                onDoubleClick={toggleFullscreen}
+                aria-label="Play or pause"
+                className="absolute inset-0 cursor-pointer"
+              />
+            )}
+
+            {episode && !playing && (
+              <div className="pointer-events-none absolute inset-0 grid place-items-center">
+                <button
+                  type="button"
+                  onClick={togglePlay}
+                  aria-label="Play"
+                  className={`${overlayPlayButtonClass} pointer-events-auto`}
+                >
+                  <PlayIcon className="ml-1 h-7 w-7" />
+                </button>
+              </div>
+            )}
+
+            {skipAction && (
+              <button
+                type="button"
+                onClick={skipAction === 'intro' ? skipIntro : skipOutro}
+                className={`${overlayButtonClass} absolute right-6 bottom-24 z-20`}
+              >
+                <NextIcon />
+                {skipAction === 'intro' ? 'Skip intro' : 'Skip outro'}
+              </button>
+            )}
+
+            {/* The bar spans the full width and sits above the panel: resizing it
+                as the panel toggles moved every control under the pointer. */}
+            {episode && (
+              <div
+                className={`absolute inset-x-0 bottom-0 z-20 transition-opacity duration-200 ${
+                  showControls ? 'opacity-100' : 'pointer-events-none opacity-0'
+                }`}
+              >
+                <Controls
+                  player={player}
+                  levels={levels}
+                  level={level}
+                  onLevelChange={handleLevelChange}
+                  onRateChange={(playbackRate) => {
+                    playerRef.current?.playbackRate(playbackRate)
+                    updateSettings({ playbackRate })
+                  }}
+                  onPrevious={() => goToEpisode(movie.episodes[episodeIndex - 1].id)}
+                  onNext={() => goToEpisode(movie.episodes[episodeIndex + 1].id)}
+                  hasPrevious={hasPrevious}
+                  hasNext={hasNext}
+                  fullscreen={fullscreen}
+                  onToggleFullscreen={toggleFullscreen}
+                />
+              </div>
+            )}
+          </div>
+
+          {panel && (
+            <aside
+              onPointerEnter={() => {
+                clearTimeout(idleTimer.current)
+                setPointerActive(true)
+              }}
+              onPointerLeave={wake}
+              className={`border-line bg-panel/95 absolute inset-y-0 right-0 z-10 flex w-80 max-w-[85%] flex-col gap-4 overflow-y-auto border-l p-4 pb-24 backdrop-blur-sm transition-opacity duration-200 ${
+                panelVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
+              }`}
+            >
+              {panel === 'edit' ? (
+                <>
+                  <h2 className="text-ink-muted text-[11px] font-medium tracking-wider uppercase">
+                    Edit movie
+                  </h2>
+                  <MovieFields
+                    movie={movie}
+                    defaults={settings}
+                    idPrefix="panel"
+                    onSave={saveMovie}
+                    onCancel={() => setPanel('episodes')}
+                  />
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-ink-muted text-[11px] font-medium tracking-wider uppercase">
+                      Episodes ({movie?.episodes.length ?? 0})
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setPanel('edit')}
+                      className={`${ghostButtonClass} ml-auto`}
+                    >
+                      <EditIcon className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
+                  </div>
+                  <EpisodeList
+                    episodes={movie?.episodes ?? []}
+                    currentId={episode?.id}
+                    onSelect={goToEpisode}
+                  />
+                </>
+              )}
+            </aside>
+          )}
+        </div>
+      </main>
+
+      {resume && episode && (
+        <ResumeDialog
+          position={resume.position}
+          duration={resume.duration}
+          onResume={handleResume}
+          onRestart={handleRestart}
+        />
+      )}
+    </>
+  )
+}
+
+/** Which skip the current position offers, if any. */
+function skipAt(time, duration, { skipLeading, skipTrailing }) {
+  // Both need a real end: a live stream has none, and an intro longer than the
+  // episode would seek past it.
+  if (!Number.isFinite(duration) || duration <= 0) return null
+  if (skipLeading > 0 && skipLeading < duration && time < skipLeading) return 'intro'
+  if (skipTrailing > 0 && duration > skipTrailing && time >= duration - skipTrailing) {
+    return 'outro'
+  }
+  return null
+}
+
+function sameSettings(left, right) {
+  return Object.keys(DEFAULT_SETTINGS).every((key) => left[key] === right[key])
+}
+
+function representationsOf(player) {
+  try {
+    return player?.tech({ IWillNotUseThisInPlugins: true })?.vhs?.representations?.() ?? []
+  } catch {
+    return []
+  }
+}
+
+function readLevels(player) {
+  return representationsOf(player)
+    .map((representation) => ({
+      id: String(representation.id),
+      height: representation.height,
+      bandwidth: representation.bandwidth,
+      label: representation.height
+        ? `${representation.height}p`
+        : `${Math.round((representation.bandwidth || 0) / 1000)} kbps`,
+    }))
+    .sort((a, b) => (b.height || b.bandwidth || 0) - (a.height || a.bandwidth || 0))
+}
