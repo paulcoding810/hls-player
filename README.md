@@ -35,13 +35,15 @@ hls-player
 
 # hls-player
 
-> A library of HLS (`.m3u8`) movies and series, played with a custom `Referer`.
+> A library of HLS (`.m3u8`) and DASH (`.mpd`) movies and series, played with a custom `Referer`.
 
 Clicking the toolbar icon opens the player — there is no popup. It picks up the movie and episode
 you watched last; with nothing to continue it opens the **library** (`gallery.html`), a gallery of
 the movies you have added. **Library** in the player header goes back to it, and playing a movie
-from there returns to the player. Streams play through [video.js](https://videojs.com/), and the `Referer` override is
-scoped to the player tab only, so the rest of your browsing is untouched. The `User-Agent` is left
+from there returns to the player. Streams play through [video.js](https://videojs.com/) — a URL ending in
+`.mpd` is played as DASH, anything else as HLS — and the `Referer` override is scoped to the player
+tab only, so the rest of your browsing is untouched. DRM (Widevine, PlayReady) is not supported, so
+DASH streams have to be clear. The `User-Agent` is left
 at the browser default.
 
 ## Library

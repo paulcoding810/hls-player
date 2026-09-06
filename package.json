@@ -3,7 +3,7 @@
   "displayName": "HLS Player",
   "version": "0.0.0",
   "author": "paulcoding",
-  "description": "Play HLS (.m3u8) streams with custom User-Agent and Referer headers",
+  "description": "Play HLS (.m3u8) and DASH (.mpd) streams with a custom Referer",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -11,6 +11,8 @@
     "firefox-extension",
     "hls",
     "m3u8",
+    "dash",
+    "mpd",
     "video.js",
     "react",
     "vite"

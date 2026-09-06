@@ -1,7 +1,8 @@
 # hls-player
 
-Chrome/Firefox MV3 extension (Vite + React 18 + Tailwind v4) that plays a library of HLS movies in
-a dedicated page with a per-tab `Referer` override. See `README.md` for the behaviour and
+Chrome/Firefox MV3 extension (Vite + React 18 + Tailwind v4) that plays a library of HLS and DASH
+movies in a dedicated page with a per-tab `Referer` override. `manifestMime()` in
+`src/utils/url.js` picks the manifest type from the URL — `.mpd` is DASH, everything else HLS. See `README.md` for the behaviour and
 `src/background/index.js` for the header-rewriting logic.
 
 Two pages: `gallery.html` (`src/gallery/Gallery.jsx`) manages the library, `player.html`

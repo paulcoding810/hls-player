@@ -22,7 +22,7 @@ import {
   overlayPlayButtonClass,
   warnBannerClass,
 } from '@components/ui'
-import { GALLERY_PATH, HLS_MIME, MESSAGE } from '@/helper/constants'
+import { GALLERY_PATH, MESSAGE } from '@/helper/constants'
 import {
   EMPTY_LIBRARY,
   findEpisode,
@@ -39,6 +39,7 @@ import { DEFAULT_SETTINGS, getSettings, sanitizeSettings, saveSettings } from '@
 import api from '@/utils/api'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
 import { stripDecoyPrefix } from '@/utils/segments'
+import { manifestMime } from '@/utils/url'
 import './Player.css'
 
 const VIDEO_JS_OPTIONS = {
@@ -293,7 +294,7 @@ export default function Player() {
 
       const { autoplay, muted, playbackRate } = configRef.current
       holdRef.current = Boolean(stored)
-      instance.src({ src: episode.src, type: HLS_MIME })
+      instance.src({ src: episode.src, type: manifestMime(episode.src) })
       instance.muted(Boolean(muted))
       instance.playbackRate(playbackRate)
 

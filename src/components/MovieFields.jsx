@@ -104,13 +104,14 @@ export default function MovieFields({
           rows={movie ? 8 : 4}
           spellCheck="false"
           className={`${inputClass} resize-y font-mono text-xs`}
-          placeholder={'https://example.com/ep1.m3u8\nEpisode 2 | https://example.com/ep2.m3u8'}
+          placeholder={'https://example.com/ep1.m3u8\nEpisode 2 | https://example.com/ep2.mpd'}
           value={episodesText}
           onChange={(event) => setEpisodesText(event.target.value)}
         />
         <p className={helpClass}>
-          One per line, optionally <code>Title | URL</code>. Untitled episodes are numbered;
-          removing a line removes the episode.
+          HLS (<code>.m3u8</code>) or DASH (<code>.mpd</code>), one per line, optionally{' '}
+          <code>Title | URL</code>. Untitled episodes are numbered; removing a line removes the
+          episode.
         </p>
       </div>
 

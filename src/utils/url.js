@@ -52,6 +52,21 @@ export function parseEpisodeLines(text) {
   return { episodes, skipped }
 }
 
+export const HLS_MIME = 'application/x-mpegURL'
+export const DASH_MIME = 'application/dash+xml'
+
+/**
+ * `.mpd` is DASH, everything else is assumed to be HLS — most stream URLs carry
+ * no usable extension, and HLS is what they turn out to be.
+ */
+export function manifestMime(src) {
+  try {
+    return new URL(src).pathname.toLowerCase().endsWith('.mpd') ? DASH_MIME : HLS_MIME
+  } catch {
+    return HLS_MIME
+  }
+}
+
 export function fileNameOf(src) {
   try {
     const { pathname, hostname } = new URL(src)
