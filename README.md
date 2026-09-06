@@ -128,6 +128,14 @@ Either way the windows are ignored for live streams, where the duration is not f
 outro is neither jumped nor offered on the last episode — there is nothing to skip to, so it plays
 out and reaching the end advances as usual.
 
+## Segments disguised as images
+
+Some hosts serve segments as PNGs to dodge filters — a small valid image with the real MPEG-TS or
+fMP4 payload concatenated after it — which the transmuxer rejects. Those responses are detected by
+their PNG signature and unwrapped before playback sees them, so such streams play without any
+configuration. The console notes the first segment it unwraps. Segments merely _named_ `.png` with
+ordinary contents never needed anything: playback goes by bytes, not by extension or MIME type.
+
 ## How the Referer override works
 
 `Referer` is a forbidden header for `fetch`/XHR, so it is rewritten at the network layer instead:

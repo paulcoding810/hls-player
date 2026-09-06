@@ -38,6 +38,7 @@ import { clearProgress, getProgress, saveProgress } from '@/helper/progress'
 import { DEFAULT_SETTINGS, getSettings, sanitizeSettings, saveSettings } from '@/helper/settings'
 import api from '@/utils/api'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
+import { stripDecoyPrefix } from '@/utils/segments'
 import './Player.css'
 
 const VIDEO_JS_OPTIONS = {
@@ -55,6 +56,9 @@ const VIDEO_JS_OPTIONS = {
     nativeVideoTracks: false,
   },
 }
+
+/** Segment bodies worth unwrapping — never `segment-key`, which is 16 bytes. */
+const SEGMENT_TYPES = new Set(['segment', 'segment-media-initialization'])
 
 const IDLE_DELAY = 2500
 
@@ -127,6 +131,28 @@ export default function Player() {
     playerRef.current = instance
     setPlayer(instance)
 
+    // Segments disguised as PNGs carry their payload behind an image header.
+    // The hook's return value is ignored and the loader reads `request.response`,
+    // so the trimmed buffer is shadowed onto the request itself.
+    let unwrapped = false
+    const unwrapSegment = (request) => {
+      if (!SEGMENT_TYPES.has(request.requestType) || request.responseType !== 'arraybuffer') return
+
+      const stripped = stripDecoyPrefix(request.response)
+      if (stripped === request.response) return
+
+      Object.defineProperty(request, 'response', { value: stripped, configurable: true })
+      if (!unwrapped) {
+        unwrapped = true
+        console.info(
+          `[hls-player] stripped a PNG header from ${request.uri} ` +
+            `(${request.bytesReceived ?? '?'} bytes in, payload at ${stripped.byteLength} bytes)`,
+        )
+      }
+    }
+
+    videojs.Vhs.xhr.onResponse(unwrapSegment)
+
     instance.on('play', () => setPlaying(true))
     instance.on('pause', () => {
       setPlaying(false)
@@ -182,6 +208,7 @@ export default function Player() {
     })
 
     return () => {
+      videojs.Vhs.xhr.offResponse(unwrapSegment)
       instance.dispose()
       playerRef.current = null
       setPlayer(null)

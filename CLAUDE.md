@@ -110,6 +110,12 @@ video.js is the HLS engine only — it is created with `controls: false`, `bigPl
 subscribed to player events; errors surface in the page banner, not over the video. Do not
 re-enable the video.js skin or add a video.js plugin for UI — extend `Controls.jsx`.
 
+VHS response hooks (`videojs.Vhs.xhr.onResponse`) are the extension point for reshaping segment
+bytes — see the PNG unwrapping in `src/player/Player.jsx` with the scanning in
+`src/utils/segments.js`. A hook's return value is ignored and the segment loader reads
+`request.response`, so a rewritten buffer has to be shadowed onto the request itself. Request hooks
+cannot set `Referer`; that is a forbidden header and stays with declarativeNetRequest.
+
 Sliders are native `<input type="range">` with `.control-range` from `Controls.css` (thumb rules
 need per-engine selectors) and the filled portion drawn as an inline gradient of the color tokens.
 Every control carries `aria-label`, and `title` names its keyboard shortcut where it has one.
