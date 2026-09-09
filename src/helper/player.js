@@ -5,6 +5,12 @@ import api from '@/utils/api'
 const TAB_KEY = 'playerTabId'
 const session = api.storage.session ?? api.storage.local
 
+/** Addressable playback: the page can be bookmarked, reloaded and shared. */
+export function playerUrlForEpisode(movieId, episodeId) {
+  const params = new URLSearchParams({ movie: movieId, episode: episodeId })
+  return `${PLAYER_PATH}?${params}`
+}
+
 /** Plays a URL straight away, without it entering the library. */
 export function playerUrlFor(src) {
   return `${PLAYER_PATH}?src=${encodeURIComponent(src)}`
@@ -14,8 +20,10 @@ export function playerUrlFor(src) {
 async function landingPath() {
   const library = await getLibrary()
   const movie = findMovie(library, library.lastPlayed?.movieId)
-  const episode = findEpisode(movie, library.lastPlayed?.episodeId)
-  return episode || movie?.episodes.length ? PLAYER_PATH : GALLERY_PATH
+  if (!movie?.episodes.length) return GALLERY_PATH
+
+  const episode = findEpisode(movie, library.lastPlayed?.episodeId) ?? movie.episodes[0]
+  return playerUrlForEpisode(movie.id, episode.id)
 }
 
 /** Focuses the existing tab when there is one, otherwise opens it. */

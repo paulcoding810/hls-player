@@ -4,7 +4,6 @@ import ConfirmDialog from '@components/ConfirmDialog'
 import MovieForm from '@components/MovieForm'
 import { EditIcon, FilmIcon, PlayIcon, PlusIcon, TrashIcon } from '@components/icons'
 import { buttonClass, ghostButtonClass, iconButtonClass } from '@components/ui'
-import { PLAYER_PATH } from '@/helper/constants'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
 import {
   addMovie,
@@ -13,9 +12,9 @@ import {
   removeMovie,
   resumeEpisodeId,
   setEpisodes,
-  setLastPlayed,
   updateMovie,
 } from '@/helper/library'
+import { playerUrlForEpisode } from '@/helper/player'
 
 function MovieCard({ movie, onPlay, onEdit, onDelete }) {
   const resumeId = resumeEpisodeId(movie)
@@ -105,11 +104,10 @@ export default function Gallery() {
     })()
   }, [])
 
-  /** Handing off to the player page, which starts from `lastPlayed`. */
-  const play = async (movieId, episodeId) => {
+  /** The player reads what to play from its own URL. */
+  const play = (movieId, episodeId) => {
     if (!episodeId) return
-    await setLastPlayed(movieId, episodeId)
-    window.location.href = PLAYER_PATH
+    window.location.href = playerUrlForEpisode(movieId, episodeId)
   }
 
   const editingMovie = library.movies.find((movie) => movie.id === editing) ?? null

@@ -36,6 +36,7 @@ import {
   setLastPlayed,
   updateMovie,
 } from '@/helper/library'
+import { playerUrlForEpisode } from '@/helper/player'
 import { clearProgress, getProgress, saveProgress } from '@/helper/progress'
 import { DEFAULT_SETTINGS, getSettings, sanitizeSettings, saveSettings } from '@/helper/settings'
 import api from '@/utils/api'
@@ -80,7 +81,10 @@ async function applyHeaders(referer) {
 }
 
 /** `?src=` names a URL to play straight away, outside the library. */
-const grabbed = normalizeSource(new URLSearchParams(window.location.search).get('src'))
+const params = new URLSearchParams(window.location.search)
+const grabbed = normalizeSource(params.get('src'))
+/** `?movie=<id>&episode=<id|1-based index>`; falling back to `lastPlayed`. */
+const requested = { movieId: params.get('movie'), episodeId: params.get('episode') }
 
 export default function Player() {
   const containerRef = useRef(null)
@@ -246,20 +250,26 @@ export default function Player() {
         return
       }
 
-      const last = findMovie(storedLibrary, storedLibrary.lastPlayed?.movieId)
-      const episodeId = last
-        ? (findEpisode(last, storedLibrary.lastPlayed?.episodeId)?.id ?? resumeEpisodeId(last))
+      const asked =
+        findMovie(storedLibrary, requested.movieId) ??
+        findMovie(storedLibrary, storedLibrary.lastPlayed?.movieId)
+      const episodeId = asked
+        ? (episodeIdIn(asked, requested.episodeId) ??
+          episodeIdIn(asked, storedLibrary.lastPlayed?.episodeId) ??
+          resumeEpisodeId(asked))
         : null
 
-      if (!last || !episodeId) {
+      if (!asked || !episodeId) {
         // `replace`, so Back does not bounce straight back here.
         window.location.replace(GALLERY_PATH)
         return
       }
 
-      setWatching({ movieId: last.id, episodeId })
-      configRef.current = resolveConfig(last, storedSettings)
+      setWatching({ movieId: asked.id, episodeId })
+      configRef.current = resolveConfig(asked, storedSettings)
       setReady(true)
+      // The toolbar icon and the library both read this to resume.
+      setLibrary(await setLastPlayed(asked.id, episodeId))
     })()
   }, [])
 
@@ -338,6 +348,7 @@ export default function Player() {
   const play = useCallback(async (movieId, episodeId) => {
     if (!episodeId) return
     setWatching({ movieId, episodeId })
+    window.history.replaceState(null, '', playerUrlForEpisode(movieId, episodeId))
     setLibrary(await setLastPlayed(movieId, episodeId))
   }, [])
 
@@ -752,6 +763,18 @@ function skipAt(time, duration, { skipLeading, skipTrailing }) {
     return 'outro'
   }
   return null
+}
+
+/** Accepts an episode id or a 1-based position; null when neither matches. */
+function episodeIdIn(movie, value) {
+  if (!value) return null
+
+  const byId = findEpisode(movie, value)
+  if (byId) return byId.id
+
+  const position = Number(value)
+  if (!Number.isInteger(position)) return null
+  return movie.episodes[position - 1]?.id ?? null
 }
 
 function sameSettings(left, right) {

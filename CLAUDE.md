@@ -11,9 +11,12 @@ the library — the `grabbed`/`source` branch in `Player.jsx`, where `movie` sta
 global settings supply the config.
 
 Two pages: `gallery.html` (`src/gallery/Gallery.jsx`) manages the library, `player.html`
-(`src/player/Player.jsx`) plays the last episode recorded in `lastPlayed` and sends you back to the
-gallery when there is nothing to continue. They hand off through storage and a plain navigation —
-there is no router, so a page must persist what the other one needs before navigating. The data model lives in `src/helper/library.js` — a library holds
+(`src/player/Player.jsx`) plays what its own query string names —
+`?movie=<id>&episode=<id|1-based index>`, or `?src=<url>` for a grabbed link — and sends you back to
+the gallery when neither resolves. There is no router: the pages hand off by navigating to a URL
+built with `playerUrlForEpisode()`/`playerUrlFor()` in `src/helper/player.js`. `lastPlayed` in
+storage is only the fallback for a bare `player.html`, which is what the toolbar icon resumes from;
+the player rewrites its own URL with `replaceState` when the episode changes. The data model lives in `src/helper/library.js` — a library holds
 movies, a movie holds episodes plus its own config, and blank config fields (`referer: ''`,
 `skipLeading/skipTrailing: null`) inherit from the global settings via `resolveConfig`. Playback
 positions live in a separate store (`src/helper/progress.js`) keyed by episode URL.

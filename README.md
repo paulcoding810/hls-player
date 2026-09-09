@@ -81,6 +81,23 @@ inherits the global default shown in it, so a series that needs a particular `Re
 **Episodes → Edit** opens it in the player's side panel — and **Library** in the player header
 comes back to this page.
 
+## Player URLs
+
+The player takes what to play from its query string, so a page can be bookmarked, reloaded or
+shared between windows:
+
+| URL                                   | Plays                               |
+| ------------------------------------- | ----------------------------------- |
+| `player.html?movie=<id>&episode=<id>` | that episode                        |
+| `player.html?movie=<id>&episode=3`    | the third episode of that movie     |
+| `player.html?movie=<id>`              | where that movie was left off       |
+| `player.html?src=<url>`               | a URL directly, outside the library |
+| `player.html`                         | the last movie and episode played   |
+
+Switching episode rewrites the URL in place, so a reload stays on the episode you are watching.
+Anything that does not resolve — an unknown id, a deleted movie — falls back to the last played
+episode, and then to the library.
+
 ## Controls
 
 The control bar is the extension's own — video.js supplies the playback engine, not the UI. It
