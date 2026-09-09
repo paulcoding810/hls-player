@@ -1,6 +1,8 @@
 import { MESSAGE } from '@/helper/constants'
-import { openPlayer } from '@/helper/player'
+import { openPlayer, playerUrlFor } from '@/helper/player'
+import { getSettings } from '@/helper/settings'
 import api from '@/utils/api'
+import { isManifestUrl } from '@/utils/url'
 
 /**
  * Chrome rewrites request headers through declarativeNetRequest session rules,
@@ -109,6 +111,28 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
 api.tabs.onRemoved.addListener((tabId) => {
   clearHeaders(tabId).catch(() => {})
 })
+
+/**
+ * A navigation to a manifest URL belongs in the player, not in the browser's
+ * plain-text view. `onBeforeNavigate` runs before the request commits, so the
+ * manifest is never fetched, and `pathSuffix` matches the path alone — a query
+ * string does not defeat it.
+ */
+api.webNavigation.onBeforeNavigate.addListener(
+  async ({ tabId, frameId, url }) => {
+    if (frameId !== 0 || !isManifestUrl(url)) return
+
+    const { grabLinks } = await getSettings()
+    if (!grabLinks) return
+
+    try {
+      await api.tabs.update(tabId, { url: api.runtime.getURL(playerUrlFor(url)) })
+    } catch (error) {
+      console.warn('failed to open the player for', url, error)
+    }
+  },
+  { url: [{ pathSuffix: '.m3u8' }, { pathSuffix: '.mpd' }] },
+)
 
 api.action.onClicked.addListener(() => {
   openPlayer().catch((error) => console.warn('failed to open the player', error))

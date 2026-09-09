@@ -67,6 +67,16 @@ export function manifestMime(src) {
   }
 }
 
+/** True when the URL *path* names a manifest, whatever the query string says. */
+export function isManifestUrl(src) {
+  try {
+    const path = new URL(src).pathname.toLowerCase()
+    return path.endsWith('.m3u8') || path.endsWith('.mpd')
+  } catch {
+    return false
+  }
+}
+
 export function fileNameOf(src) {
   try {
     const { pathname, hostname } = new URL(src)

@@ -92,6 +92,19 @@ export default function SettingsPanel({ settings, onChange }) {
         <input
           type="checkbox"
           className={checkboxClass}
+          checked={settings.grabLinks}
+          onChange={(event) => onChange({ grabLinks: event.target.checked })}
+        />
+        Open .m3u8 and .mpd links in the player
+      </label>
+      <p className={`${helpClass} -mt-2`}>
+        Off, the browser shows or downloads the manifest as usual.
+      </p>
+
+      <label className={checkboxRowClass}>
+        <input
+          type="checkbox"
+          className={checkboxClass}
           checked={settings.autoplay}
           onChange={(event) => onChange({ autoplay: event.target.checked })}
         />

@@ -5,6 +5,11 @@ movies in a dedicated page with a per-tab `Referer` override. `manifestMime()` i
 `src/utils/url.js` picks the manifest type from the URL — `.mpd` is DASH, everything else HLS. See `README.md` for the behaviour and
 `src/background/index.js` for the header-rewriting logic.
 
+Navigations to a `.m3u8`/`.mpd` path are taken over in `src/background/index.js`
+(`webNavigation.onBeforeNavigate`) and sent to `player.html?src=…`, which plays that URL outside
+the library — the `grabbed`/`source` branch in `Player.jsx`, where `movie` stays null and the
+global settings supply the config.
+
 Two pages: `gallery.html` (`src/gallery/Gallery.jsx`) manages the library, `player.html`
 (`src/player/Player.jsx`) plays the last episode recorded in `lastPlayed` and sends you back to the
 gallery when there is nothing to continue. They hand off through storage and a plain navigation —

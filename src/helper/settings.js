@@ -5,6 +5,8 @@ export const DEFAULT_SETTINGS = {
   referer: '',
   /** Remembered UI state: the Referer last typed into the add form. */
   lastReferer: '',
+  /** Take over navigations to a `.m3u8` or `.mpd` URL. */
+  grabLinks: true,
   autoplay: true,
   muted: false,
   playbackRate: 1,
@@ -29,6 +31,7 @@ export function sanitizeSettings(settings) {
     autoplay: Boolean(settings.autoplay),
     muted: Boolean(settings.muted),
     autoSkip: Boolean(settings.autoSkip),
+    grabLinks: Boolean(settings.grabLinks),
     playbackRate: Number(settings.playbackRate) > 0 ? Number(settings.playbackRate) : 1,
     skipLeading: toSeconds(settings.skipLeading),
     skipTrailing: toSeconds(settings.skipTrailing),

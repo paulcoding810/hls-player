@@ -5,6 +5,11 @@ import api from '@/utils/api'
 const TAB_KEY = 'playerTabId'
 const session = api.storage.session ?? api.storage.local
 
+/** Plays a URL straight away, without it entering the library. */
+export function playerUrlFor(src) {
+  return `${PLAYER_PATH}?src=${encodeURIComponent(src)}`
+}
+
 /** The player continues the last episode; with nothing to continue, the library. */
 async function landingPath() {
   const library = await getLibrary()

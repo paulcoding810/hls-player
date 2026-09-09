@@ -40,6 +40,6 @@ export default defineManifest({
   ],
   // `declarativeNetRequest` powers the Referer override on Chrome.
   // `convert.js` swaps it for blocking `webRequest` on Firefox.
-  permissions: ['storage', 'declarativeNetRequest'],
+  permissions: ['storage', 'declarativeNetRequest', 'webNavigation'],
   host_permissions: ['<all_urls>'],
 })

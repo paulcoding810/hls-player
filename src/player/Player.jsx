@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import videojs from 'video.js'
 import 'video.js/dist/video-js.css'
 
@@ -13,6 +13,7 @@ import {
   NextIcon,
   PlaylistIcon,
   PlayIcon,
+  PlusIcon,
 } from '@components/icons'
 import {
   activeGhostClass,
@@ -24,6 +25,7 @@ import {
 } from '@components/ui'
 import { GALLERY_PATH, MESSAGE } from '@/helper/constants'
 import {
+  addMovie,
   EMPTY_LIBRARY,
   findEpisode,
   findMovie,
@@ -39,7 +41,7 @@ import { DEFAULT_SETTINGS, getSettings, sanitizeSettings, saveSettings } from '@
 import api from '@/utils/api'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
 import { stripDecoyPrefix } from '@/utils/segments'
-import { manifestMime } from '@/utils/url'
+import { fileNameOf, manifestMime, normalizeSource } from '@/utils/url'
 import './Player.css'
 
 const VIDEO_JS_OPTIONS = {
@@ -77,6 +79,9 @@ async function applyHeaders(referer) {
   }
 }
 
+/** `?src=` names a URL to play straight away, outside the library. */
+const grabbed = normalizeSource(new URLSearchParams(window.location.search).get('src'))
+
 export default function Player() {
   const containerRef = useRef(null)
   const stageRef = useRef(null)
@@ -110,10 +115,17 @@ export default function Player() {
   const [skip, setSkip] = useState(null)
   const [granted, setGranted] = useState(true)
   const [resume, setResume] = useState(null)
+  /** Set once a grabbed link has been kept. */
+  const [saved, setSaved] = useState(null)
 
   const movie = findMovie(library, watching?.movieId)
   const episode = findEpisode(movie, watching?.episodeId)
   const episodeIndex = movie?.episodes.findIndex((item) => item.id === episode?.id) ?? -1
+  /** What is playing: a grabbed URL, otherwise the queued episode. */
+  const source = useMemo(
+    () => (grabbed ? { id: grabbed, title: fileNameOf(grabbed), src: grabbed } : episode),
+    [episode],
+  )
   // Inputs keep their raw text; playback reads sanitized numbers.
   const config = resolveConfig(movie, sanitizeSettings(settings))
 
@@ -228,6 +240,12 @@ export default function Player() {
       setLibrary(storedLibrary)
       setGranted(permission)
 
+      if (grabbed) {
+        configRef.current = resolveConfig(null, storedSettings)
+        setReady(true)
+        return
+      }
+
       const last = findMovie(storedLibrary, storedLibrary.lastPlayed?.movieId)
       const episodeId = last
         ? (findEpisode(last, storedLibrary.lastPlayed?.episodeId)?.id ?? resumeEpisodeId(last))
@@ -263,13 +281,13 @@ export default function Player() {
     return () => document.removeEventListener('fullscreenchange', listener)
   }, [])
 
-  // Load whenever the episode changes.
+  // Load whenever what is playing changes.
   useEffect(() => {
-    if (!ready || !episode) return
+    if (!ready || !source) return
     let cancelled = false
 
     ;(async () => {
-      srcRef.current = episode.src
+      srcRef.current = source.src
       savedAtRef.current = 0
       skippedRef.current = false
       holdRef.current = false
@@ -289,12 +307,12 @@ export default function Player() {
       const instance = playerRef.current
       if (!instance) return
 
-      const stored = await getProgress(episode.src)
+      const stored = await getProgress(source.src)
       if (cancelled) return
 
       const { autoplay, muted, playbackRate } = configRef.current
       holdRef.current = Boolean(stored)
-      instance.src({ src: episode.src, type: manifestMime(episode.src) })
+      instance.src({ src: source.src, type: manifestMime(source.src) })
       instance.muted(Boolean(muted))
       instance.playbackRate(playbackRate)
 
@@ -310,11 +328,12 @@ export default function Player() {
     return () => {
       cancelled = true
     }
-  }, [ready, episode?.id, episode?.src, config.referer])
+  }, [ready, source?.id, source?.src, config.referer])
 
   useEffect(() => {
-    document.title = episode ? `${episode.title} – ${movie.title}` : 'HLS Player'
-  }, [episode, movie?.title])
+    if (!source) document.title = 'HLS Player'
+    else document.title = movie ? `${source.title} – ${movie.title}` : source.title
+  }, [source, movie?.title])
 
   const play = useCallback(async (movieId, episodeId) => {
     if (!episodeId) return
@@ -323,7 +342,7 @@ export default function Player() {
   }, [])
 
   useEffect(() => {
-    if (!ready || !watching?.movieId || !movie || episode) return
+    if (grabbed || !ready || !watching?.movieId || !movie || episode) return
     // The episode being watched was edited away.
     const fallback = resumeEpisodeId(movie)
     if (fallback) play(movie.id, fallback)
@@ -360,8 +379,8 @@ export default function Player() {
   }, [playing, wake])
 
   useEffect(() => {
-    if (!episode) playerRef.current?.pause()
-  }, [episode])
+    if (!source) playerRef.current?.pause()
+  }, [source])
 
   /** Seeking before metadata lands does not stick, so it waits when needed. */
   const startAt = useCallback((time) => {
@@ -422,6 +441,19 @@ export default function Player() {
     })
   }, [])
 
+  /**
+   * Saving does not re-point playback at the new entry: the URL is already what
+   * is playing and progress is written against it, so switching would only
+   * restart the stream.
+   */
+  const addToLibrary = async () => {
+    const movieAdded = await addMovie({
+      title: fileNameOf(grabbed),
+      episodes: [{ src: grabbed, title: fileNameOf(grabbed) }],
+    })
+    setSaved(movieAdded.id)
+  }
+
   const saveMovie = async ({ episodes, ...patch }) => {
     await updateMovie(movie.id, patch)
     setLibrary(await setEpisodes(movie.id, episodes))
@@ -443,7 +475,7 @@ export default function Player() {
   // Keyboard shortcuts, unless a form control has focus.
   useEffect(() => {
     const listener = (event) => {
-      if (resume || panel === 'edit' || !episode) return
+      if (resume || panel === 'edit' || !source) return
       const target = event.target
       if (target?.closest?.('input, textarea, select, [contenteditable]')) return
 
@@ -522,9 +554,9 @@ export default function Player() {
             Library
           </button>
 
-          <span className="truncate text-sm" title={episode?.src || ''}>
-            {movie?.title}
-            {episode && <span className="text-ink-faint"> · {episode.title}</span>}
+          <span className="truncate text-sm" title={source?.src || ''}>
+            {movie?.title ?? source?.title}
+            {movie && source && <span className="text-ink-faint"> · {source.title}</span>}
           </span>
           {movie?.episodes.length > 1 && episodeIndex > -1 && (
             <span className="text-ink-faint shrink-0 text-xs">
@@ -532,14 +564,26 @@ export default function Player() {
             </span>
           )}
 
-          <button
-            type="button"
-            onClick={() => setPanel(panel ? null : 'episodes')}
-            className={`${ghostButtonClass} ml-auto ${panel ? activeGhostClass : ''}`}
-          >
-            <PlaylistIcon />
-            Episodes
-          </button>
+          {grabbed ? (
+            <button
+              type="button"
+              onClick={addToLibrary}
+              disabled={Boolean(saved)}
+              className={`${ghostButtonClass} ml-auto`}
+            >
+              <PlusIcon />
+              {saved ? 'Added to library' : 'Add to library'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPanel(panel ? null : 'episodes')}
+              className={`${ghostButtonClass} ml-auto ${panel ? activeGhostClass : ''}`}
+            >
+              <PlaylistIcon />
+              Episodes
+            </button>
+          )}
         </header>
 
         {!granted && (
@@ -572,7 +616,7 @@ export default function Player() {
           >
             <div ref={containerRef} className="absolute inset-0" data-vjs-player />
 
-            {episode && (
+            {source && (
               <button
                 type="button"
                 tabIndex={-1}
@@ -583,7 +627,7 @@ export default function Player() {
               />
             )}
 
-            {episode && !playing && (
+            {source && !playing && (
               <div className="pointer-events-none absolute inset-0 grid place-items-center">
                 <button
                   type="button"
@@ -609,7 +653,7 @@ export default function Player() {
 
             {/* The bar spans the full width and sits above the panel: resizing it
                 as the panel toggles moved every control under the pointer. */}
-            {episode && (
+            {source && (
               <div
                 className={`absolute inset-x-0 bottom-0 z-20 transition-opacity duration-200 ${
                   showControls ? 'opacity-100' : 'pointer-events-none opacity-0'
@@ -635,7 +679,7 @@ export default function Player() {
             )}
           </div>
 
-          {panel && (
+          {panel && !grabbed && (
             <aside
               onPointerEnter={() => {
                 clearTimeout(idleTimer.current)
@@ -676,7 +720,7 @@ export default function Player() {
                   </div>
                   <EpisodeList
                     episodes={movie?.episodes ?? []}
-                    currentId={episode?.id}
+                    currentId={source?.id}
                     onSelect={goToEpisode}
                   />
                 </>
@@ -686,7 +730,7 @@ export default function Player() {
         </div>
       </main>
 
-      {resume && episode && (
+      {resume && source && (
         <ResumeDialog
           position={resume.position}
           duration={resume.duration}

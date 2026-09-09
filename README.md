@@ -46,6 +46,18 @@ tab only, so the rest of your browsing is untouched. DRM (Widevine, PlayReady) i
 DASH streams have to be clear. The `User-Agent` is left
 at the browser default.
 
+## Grabbing links
+
+Navigating to a URL whose **path** ends in `.m3u8` or `.mpd` opens it in the player instead of
+letting the browser show or download the manifest — paste one in the address bar, or click such a
+link on a page. The match is on the path, so `…/index.m3u8?token=abc` counts, while
+`…/watch?file=video.m3u8` does not.
+
+A grabbed link plays without entering the library. **Add to library** in the player header keeps it
+as a movie named after the file; either way the watch position is stored against the URL, so a link
+you keep resumes where the throwaway playback left off. Turn the takeover off with **Open .m3u8 and
+.mpd links in the player** on the options page.
+
 ## Library
 
 A **movie** is a title, an optional poster, a list of **episodes**, and the config those episodes
