@@ -1,1 +1,17 @@
-{ "typeAcquisition": { "include": ["chrome"] } }
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "@assets/*": ["src/assets/*"]
+    },
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "jsx": "react-jsx",
+    "checkJs": false
+  },
+  "include": ["src", "*.js"],
+  "typeAcquisition": { "include": ["chrome"] }
+}
