@@ -15,8 +15,9 @@ Two pages: `gallery.html` (`src/gallery/Gallery.jsx`) manages the library, `play
 `?movie=<id>&episode=<id|1-based index>`, or `?src=<url>` for a grabbed link — and sends you back to
 the gallery when neither resolves. There is no router: the pages hand off by navigating to a URL
 built with `playerUrlForEpisode()`/`playerUrlFor()` in `src/helper/player.js`. `lastPlayed` in
-storage is only the fallback for a bare `player.html`, which is what the toolbar icon resumes from;
-the player rewrites its own URL with `replaceState` when the episode changes. The data model lives in `src/helper/library.js` — a library holds
+storage is the fallback for a bare `player.html` and what the gallery's Continue watching panel
+reads; the player rewrites its own URL with `replaceState` when the episode changes. The toolbar
+icon (`openGallery()`) always lands on the gallery. The data model lives in `src/helper/library.js` — a library holds
 movies, a movie holds episodes plus its own config, and blank config fields (`referer: ''`,
 `skipLeading/skipTrailing: null`) inherit from the global settings via `resolveConfig`. Playback
 positions live in a separate store (`src/helper/progress.js`) keyed by episode URL.

@@ -8,6 +8,8 @@ import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
 import {
   addMovie,
   EMPTY_LIBRARY,
+  findEpisode,
+  findMovie,
   getLibrary,
   removeMovie,
   resumeEpisodeId,
@@ -15,6 +17,8 @@ import {
   updateMovie,
 } from '@/helper/library'
 import { playerUrlForEpisode } from '@/helper/player'
+import { getProgress } from '@/helper/progress'
+import { formatTime } from '@/utils/time'
 
 function MovieCard({ movie, onPlay, onEdit, onDelete }) {
   const resumeId = resumeEpisodeId(movie)
@@ -89,6 +93,54 @@ function MovieCard({ movie, onPlay, onEdit, onDelete }) {
  * The page itself scrolls (`min-h-screen`, no inner scroll container), so the
  * grid grows with the library and no card is ever clipped.
  */
+function ContinueWatching({ movie, episode, progress, onPlay }) {
+  const percent =
+    progress && Number.isFinite(progress.duration) && progress.duration > 0
+      ? Math.round((progress.position / progress.duration) * 100)
+      : null
+
+  return (
+    <section className="border-line bg-panel mb-6 flex items-center gap-4 rounded-md border p-4">
+      <div className="bg-elevated h-24 w-16 shrink-0 overflow-hidden rounded-md">
+        {movie.poster ? (
+          <img src={movie.poster} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="text-ink-faint grid h-full place-items-center">
+            <FilmIcon className="h-6 w-6" />
+          </span>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-ink-faint text-[11px] font-medium tracking-wider uppercase">
+          Continue watching
+        </p>
+        <h2 className="truncate text-sm font-medium" title={movie.title}>
+          {movie.title}
+        </h2>
+        <p className="text-ink-muted truncate text-xs">
+          {episode.title}
+          {progress && ` · ${formatTime(progress.position)} of ${formatTime(progress.duration)}`}
+        </p>
+        {percent !== null && (
+          <div className="bg-elevated mt-2 h-1 w-full max-w-sm rounded-full">
+            <div className="bg-primary h-1 rounded-full" style={{ width: `${percent}%` }} />
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onPlay(movie.id, episode.id)}
+        className={`${buttonClass} shrink-0`}
+      >
+        <PlayIcon />
+        Continue
+      </button>
+    </section>
+  )
+}
+
 export default function Gallery() {
   const [library, setLibrary] = useState(EMPTY_LIBRARY)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
@@ -96,13 +148,24 @@ export default function Gallery() {
   const [editing, setEditing] = useState(null)
   const [deleting, setDeleting] = useState(null)
 
+  const [progress, setProgress] = useState(null)
+
   useEffect(() => {
     ;(async () => {
       const [storedLibrary, storedSettings] = await Promise.all([getLibrary(), getSettings()])
       setLibrary(storedLibrary)
       setSettings(storedSettings)
+
+      const movie = findMovie(storedLibrary, storedLibrary.lastPlayed?.movieId)
+      const episode = findEpisode(movie, storedLibrary.lastPlayed?.episodeId)
+      if (episode) setProgress(await getProgress(episode.src))
     })()
   }, [])
+
+  const lastMovie = findMovie(library, library.lastPlayed?.movieId)
+  const lastEpisode =
+    findEpisode(lastMovie, library.lastPlayed?.episodeId) ??
+    findEpisode(lastMovie, resumeEpisodeId(lastMovie))
 
   /** The player reads what to play from its own URL. */
   const play = (movieId, episodeId) => {
@@ -140,12 +203,21 @@ export default function Gallery() {
         <button
           type="button"
           onClick={() => setEditing('new')}
-          className={`${buttonClass} ml-auto`}
+          className={`${ghostButtonClass} ml-auto`}
         >
           <PlusIcon />
           Add movie
         </button>
       </header>
+
+      {lastMovie && lastEpisode && (
+        <ContinueWatching
+          movie={lastMovie}
+          episode={lastEpisode}
+          progress={progress}
+          onPlay={play}
+        />
+      )}
 
       {library.movies.length === 0 ? (
         <div className="text-ink-faint flex flex-1 flex-col items-center justify-center gap-3">

@@ -1,5 +1,5 @@
 import { MESSAGE } from '@/helper/constants'
-import { openPlayer, playerUrlFor } from '@/helper/player'
+import { openGallery, playerUrlFor } from '@/helper/player'
 import { getSettings } from '@/helper/settings'
 import api from '@/utils/api'
 import { isManifestUrl } from '@/utils/url'
@@ -135,12 +135,12 @@ api.webNavigation.onBeforeNavigate.addListener(
 )
 
 api.action.onClicked.addListener(() => {
-  openPlayer().catch((error) => console.warn('failed to open the player', error))
+  openGallery().catch((error) => console.warn('failed to open the library', error))
 })
 
 api.runtime.onInstalled.addListener((details) => {
   dropOrphanRules()
-  if (details.reason === 'install') openPlayer()
+  if (details.reason === 'install') openGallery()
 })
 
 api.runtime.onStartup?.addListener(dropOrphanRules)

@@ -1,5 +1,4 @@
 import { GALLERY_PATH, PLAYER_PATH } from './constants'
-import { findEpisode, findMovie, getLibrary } from './library'
 import api from '@/utils/api'
 
 const TAB_KEY = 'playerTabId'
@@ -16,18 +15,11 @@ export function playerUrlFor(src) {
   return `${PLAYER_PATH}?src=${encodeURIComponent(src)}`
 }
 
-/** The player continues the last episode; with nothing to continue, the library. */
-async function landingPath() {
-  const library = await getLibrary()
-  const movie = findMovie(library, library.lastPlayed?.movieId)
-  if (!movie?.episodes.length) return GALLERY_PATH
-
-  const episode = findEpisode(movie, library.lastPlayed?.episodeId) ?? movie.episodes[0]
-  return playerUrlForEpisode(movie.id, episode.id)
-}
-
-/** Focuses the existing tab when there is one, otherwise opens it. */
-export async function openPlayer() {
+/**
+ * The library is the way in — it carries a Continue watching section for
+ * whatever was playing last. Focuses the existing tab when there is one.
+ */
+export async function openGallery() {
   const stored = await session.get(TAB_KEY)
   const tabId = stored?.[TAB_KEY]
 
@@ -42,7 +34,7 @@ export async function openPlayer() {
     }
   }
 
-  const tab = await api.tabs.create({ url: api.runtime.getURL(await landingPath()) })
+  const tab = await api.tabs.create({ url: api.runtime.getURL(GALLERY_PATH) })
   await session.set({ [TAB_KEY]: tab.id })
   return tab
 }
