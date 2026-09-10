@@ -17,13 +17,29 @@ import {
   updateMovie,
 } from '@/helper/library'
 import { playerUrlForEpisode } from '@/helper/player'
-import { getProgress } from '@/helper/progress'
+import { getAllProgress } from '@/helper/progress'
 import { formatTime } from '@/utils/time'
 
-function MovieCard({ movie, onPlay, onEdit, onDelete }) {
+/** Null unless the stored entry has a real duration to measure against. */
+function percentOf(progress) {
+  if (!progress || !Number.isFinite(progress.duration) || progress.duration <= 0) return null
+  return Math.min(100, Math.round((progress.position / progress.duration) * 100))
+}
+
+function ProgressBar({ percent, className = '' }) {
+  return (
+    <span className={`bg-elevated block h-1 overflow-hidden rounded-full ${className}`}>
+      <span className="bg-primary block h-full" style={{ width: `${Math.max(percent, 2)}%` }} />
+    </span>
+  )
+}
+
+function MovieCard({ movie, positions = {}, onPlay, onEdit, onDelete }) {
   const resumeId = resumeEpisodeId(movie)
   const resumeIndex = movie.episodes.findIndex((episode) => episode.id === resumeId)
+  const resumeEpisode = movie.episodes[resumeIndex]
   const started = Boolean(movie.lastEpisodeId)
+  const percent = resumeEpisode ? percentOf(positions[resumeEpisode.src]) : null
 
   return (
     <article className="border-line bg-panel flex flex-col overflow-hidden rounded-md border">
@@ -44,6 +60,9 @@ function MovieCard({ movie, onPlay, onEdit, onDelete }) {
         <span className="absolute inset-0 grid place-items-center bg-black/50 opacity-0 transition group-hover:opacity-100">
           <PlayIcon className="text-ink h-10 w-10" />
         </span>
+        {percent !== null && (
+          <ProgressBar percent={percent} className="absolute inset-x-0 bottom-0 rounded-none" />
+        )}
       </button>
 
       <div className="flex min-w-0 flex-col gap-1 p-3">
@@ -52,7 +71,7 @@ function MovieCard({ movie, onPlay, onEdit, onDelete }) {
         </h3>
         <p className="text-ink-faint text-xs">
           {movie.episodes.length} episode{movie.episodes.length === 1 ? '' : 's'}
-          {resumeIndex > 0 && ` · at ${movie.episodes[resumeIndex].title}`}
+          {resumeIndex > 0 && ` · at ${resumeEpisode.title}`}
         </p>
 
         <div className="mt-2 flex items-center gap-2">
@@ -94,10 +113,7 @@ function MovieCard({ movie, onPlay, onEdit, onDelete }) {
  * grid grows with the library and no card is ever clipped.
  */
 function ContinueWatching({ movie, episode, progress, onPlay }) {
-  const percent =
-    progress && Number.isFinite(progress.duration) && progress.duration > 0
-      ? Math.round((progress.position / progress.duration) * 100)
-      : null
+  const percent = percentOf(progress)
 
   return (
     <section className="border-line bg-panel mb-6 flex items-center gap-4 rounded-md border p-4">
@@ -122,11 +138,7 @@ function ContinueWatching({ movie, episode, progress, onPlay }) {
           {episode.title}
           {progress && ` · ${formatTime(progress.position)} of ${formatTime(progress.duration)}`}
         </p>
-        {percent !== null && (
-          <div className="bg-elevated mt-2 h-1 w-full max-w-sm rounded-full">
-            <div className="bg-primary h-1 rounded-full" style={{ width: `${percent}%` }} />
-          </div>
-        )}
+        {percent !== null && <ProgressBar percent={percent} className="mt-2 w-full max-w-sm" />}
       </div>
 
       <button
@@ -148,7 +160,8 @@ export default function Gallery() {
   const [editing, setEditing] = useState(null)
   const [deleting, setDeleting] = useState(null)
 
-  const [progress, setProgress] = useState(null)
+  /** Stored positions keyed by episode URL. */
+  const [positions, setPositions] = useState({})
 
   useEffect(() => {
     ;(async () => {
@@ -156,9 +169,7 @@ export default function Gallery() {
       setLibrary(storedLibrary)
       setSettings(storedSettings)
 
-      const movie = findMovie(storedLibrary, storedLibrary.lastPlayed?.movieId)
-      const episode = findEpisode(movie, storedLibrary.lastPlayed?.episodeId)
-      if (episode) setProgress(await getProgress(episode.src))
+      setPositions(await getAllProgress())
     })()
   }, [])
 
@@ -214,7 +225,7 @@ export default function Gallery() {
         <ContinueWatching
           movie={lastMovie}
           episode={lastEpisode}
-          progress={progress}
+          progress={positions[lastEpisode.src]}
           onPlay={play}
         />
       )}
@@ -234,6 +245,7 @@ export default function Gallery() {
             <MovieCard
               key={movie.id}
               movie={movie}
+              positions={positions}
               onPlay={play}
               onEdit={setEditing}
               onDelete={setDeleting}

@@ -13,6 +13,11 @@ async function readAll() {
   return (await progressStorage.get()) || {}
 }
 
+/** The whole map, for views that need many positions at once. */
+export async function getAllProgress() {
+  return readAll()
+}
+
 export async function getProgress(src) {
   const entry = (await readAll())[src]
   return entry?.position > 0 ? entry : null
