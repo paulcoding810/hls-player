@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
     build: {
       emptyOutDir: true,
       outDir: `build/${browser}`,
+      // Development builds ship .map files so the unpacked extension shows real
+      // sources in devtools; production stays clean.
+      sourcemap: mode === 'development',
       rollupOptions: {
         // Neither page is reachable from the manifest — the extension opens them
         // itself — so both are declared as entry points.
