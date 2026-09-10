@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   FullscreenExitIcon,
@@ -24,6 +24,7 @@ const PLAYER_EVENTS = [
   'loadedmetadata',
   'volumechange',
   'ratechange',
+  'seeking',
   'seeked',
   'emptied',
 ]
@@ -68,6 +69,7 @@ export default function Controls({
   onRateChange,
   onPrevious,
   onNext,
+  onSeekingChange,
   hasPrevious,
   hasNext,
   fullscreen,
@@ -76,6 +78,9 @@ export default function Controls({
   const [state, setState] = useState(EMPTY_STATE)
   /** Non-null while the seek bar is being dragged. */
   const [scrubbing, setScrubbing] = useState(null)
+  // Mirrors `scrubbing` for the commit, which runs in a later event and so
+  // cannot rely on the state update from this one having rendered yet.
+  const pendingSeek = useRef(null)
 
   useEffect(() => {
     if (!player) return
@@ -93,10 +98,35 @@ export default function Controls({
   const played = seekable ? (position / state.duration) * 100 : 0
   const buffered = seekable ? (state.buffered / state.duration) * 100 : 0
 
-  const commitSeek = () => {
-    if (scrubbing === null) return
-    player.currentTime(scrubbing)
+  const startSeek = () => {
+    pendingSeek.current = state.currentTime
+    onSeekingChange?.(true)
+  }
+
+  const moveSeek = (event) => {
+    pendingSeek.current = Number(event.target.value)
+    setScrubbing(pendingSeek.current)
+  }
+
+  const commitSeek = (event) => {
+    if (pendingSeek.current === null) return
+    // A click that lands on the thumb leaves the value alone, so no change event
+    // fires; the element itself holds whatever the browser settled on.
+    const value = Number(event.currentTarget.value)
+    const target = Number.isFinite(value) ? value : pendingSeek.current
+    player.currentTime(target)
+    pendingSeek.current = null
+    // `state` only moves when the player emits, so dropping `scrubbing` before
+    // then would render the pre-seek time and snap the thumb backwards.
+    setState((current) => ({ ...current, currentTime: target }))
     setScrubbing(null)
+    onSeekingChange?.(false)
+  }
+
+  const cancelSeek = () => {
+    pendingSeek.current = null
+    setScrubbing(null)
+    onSeekingChange?.(false)
   }
 
   return (
@@ -111,8 +141,10 @@ export default function Controls({
         aria-label="Seek"
         className="control-range w-full"
         style={trackBackground(played, buffered)}
-        onChange={(event) => setScrubbing(Number(event.target.value))}
+        onPointerDown={startSeek}
+        onChange={moveSeek}
         onPointerUp={commitSeek}
+        onPointerCancel={cancelSeek}
         onKeyUp={commitSeek}
         onBlur={commitSeek}
       />

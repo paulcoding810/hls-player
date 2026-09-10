@@ -105,6 +105,8 @@ export default function Player() {
   const [player, setPlayer] = useState(null)
   const [playing, setPlaying] = useState(false)
   const [pointerActive, setPointerActive] = useState(true)
+  // The idle timer must not pull the controls out from under a seek in progress.
+  const [seeking, setSeeking] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
   const [library, setLibrary] = useState(EMPTY_LIBRARY)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
@@ -547,7 +549,7 @@ export default function Player() {
     })
   }
 
-  const showControls = !playing || pointerActive
+  const showControls = !playing || pointerActive || seeking
   // The editor must not vanish mid-typing, so only the episode list fades.
   const panelVisible = showControls || panel === 'edit'
 
@@ -683,6 +685,7 @@ export default function Player() {
                   onNext={() => goToEpisode(movie.episodes[episodeIndex + 1].id)}
                   hasPrevious={hasPrevious}
                   hasNext={hasNext}
+                  onSeekingChange={setSeeking}
                   fullscreen={fullscreen}
                   onToggleFullscreen={toggleFullscreen}
                 />
