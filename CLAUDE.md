@@ -113,7 +113,9 @@ inherit `currentColor`, never give an icon its own color — color the parent.
 
 Skipping an intro or outro is driven by the movie config: `skipAt()` in `src/player/Player.jsx`
 returns which window the position falls in, and the global `autoSkip` setting decides whether the
-player jumps it or offers an overlay button. The player page has no global settings UI — those live on the options page — but
+player jumps it or offers an overlay button. An auto-skipped intro is taken at once, but the outro
+runs an `OUTRO_COUNTDOWN` counter first that the viewer can decline; it is held while paused and
+cleared when the position leaves the window, so it cannot fire on a rewatch. The player page has no global settings UI — those live on the options page — but
 the movie form itself (`MovieFields.jsx`) renders both as a modal on the library page and inline in
 the player's side panel.
 

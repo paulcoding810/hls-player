@@ -20,6 +20,7 @@ import {
   activeGhostClass,
   dangerBannerClass,
   ghostButtonClass,
+  linkButtonClass,
   overlayButtonClass,
   overlayPlayButtonClass,
   warnBannerClass,
@@ -77,6 +78,9 @@ const MAX_PLAYLIST_RETRIES = 3
 
 /** Segment bodies worth unwrapping — never `segment-key`, which is 16 bytes. */
 const SEGMENT_TYPES = new Set(['segment', 'segment-media-initialization'])
+
+/** Seconds of grace before an auto-skipped outro moves on, long enough to stop it. */
+const OUTRO_COUNTDOWN = 5
 
 const IDLE_DELAY = 2500
 
@@ -137,6 +141,8 @@ export default function Player() {
   const [panel, setPanel] = useState(null)
   /** `intro`, `outro` or null — which skip button the position calls for. */
   const [skip, setSkip] = useState(null)
+  /** Seconds left before the outro advances, or null when nothing is pending. */
+  const [countdown, setCountdown] = useState(null)
   const [granted, setGranted] = useState(true)
   const [resume, setResume] = useState(null)
   /** Set once a grabbed link has been kept. */
@@ -288,15 +294,20 @@ export default function Player() {
 
       const window = skipAt(time, instance.duration(), configRef.current)
       if (!configRef.current.autoSkip) {
+        // Turning auto skip off mid-countdown hands the choice back over.
+        setCountdown(null)
         setSkip(window)
         return
       }
 
       setSkip(null)
+      // Seeking back out of the outro takes the pending jump with it, so a
+      // rewatch is not yanked forward. React bails when it is already null.
+      if (window !== 'outro') setCountdown(null)
       // Nothing to jump to on the last episode, so it plays out instead.
       if (window === 'outro' && hasNextRef.current && !skippedRef.current) {
         skippedRef.current = true
-        advanceRef.current()
+        setCountdown(OUTRO_COUNTDOWN)
       }
     })
 
@@ -385,6 +396,7 @@ export default function Player() {
       holdRef.current = false
       setResume(null)
       setSkip(null)
+      setCountdown(null)
       setError('')
       setLevels([])
       setLevel('auto')
@@ -457,6 +469,21 @@ export default function Player() {
       else playerRef.current?.pause()
     }
   }, [movie, episodeIndex, goToEpisode])
+
+  // Counts the outro down, then advances. Paused playback holds the count
+  // where it is: counting on while someone reads the credits would jump them.
+  useEffect(() => {
+    if (countdown === null) return undefined
+    if (countdown <= 0) {
+      setCountdown(null)
+      advanceRef.current()
+      return undefined
+    }
+    if (!playing) return undefined
+
+    const timer = setTimeout(() => setCountdown((value) => value - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [countdown, playing])
 
   /** Hides the controls while playback is left alone. */
   const wake = useCallback(() => {
@@ -729,6 +756,21 @@ export default function Player() {
                   className={`${overlayPlayButtonClass} pointer-events-auto`}
                 >
                   <PlayIcon className="ml-1 h-7 w-7" />
+                </button>
+              </div>
+            )}
+
+            {countdown !== null && (
+              <div className="border-line absolute right-6 bottom-24 z-20 flex items-center gap-3 rounded-md border bg-black/70 px-4 py-2 text-sm backdrop-blur-sm">
+                <span className="text-ink">
+                  Next episode in <span className="font-mono">{countdown}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCountdown(null)}
+                  className={linkButtonClass}
+                >
+                  Stay
                 </button>
               </div>
             )}

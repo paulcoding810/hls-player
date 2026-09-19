@@ -147,8 +147,11 @@ defaults, which live on the options page:
 | Speed            | playback rate applied to every episode                | no        |
 | Autoplay / muted | how playback begins (browsers block unmuted autoplay) | no        |
 
-With **Auto skip** on (the default), _skip intro_ at 40 starts each episode at 0:40 and _skip
-outro_ at 30 moves to the next episode 30 seconds before the end. Turn it off and the same windows
+With **Auto skip** on (the default), _skip intro_ at 40 starts each episode at 0:40, and _skip
+outro_ at 30 offers to move on 30 seconds before the end. The outro is not taken at once: a
+**Next episode in 5** counter appears over the video, so there is time to press **Stay** and watch
+the credits. The count holds while playback is paused and is dropped entirely if you seek back out
+of the outro, so rewinding never pulls you forward. Turn Auto skip off and the same windows
 become buttons: **Skip intro** sits above the controls for the first 40 seconds, **Skip outro** for
 the last 30, and neither acts until clicked.
 
