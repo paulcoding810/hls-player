@@ -57,11 +57,23 @@ const VIDEO_JS_OPTIONS = {
   html5: {
     // Always play through videojs-http-streaming so the Referer override
     // applies to every playlist and segment request.
-    vhs: { overrideNative: true },
+    // `maxPlaylistRetries` bounds the retry loop for a stream that has more
+    // than one rendition; the single-rendition case is handled below.
+    vhs: { overrideNative: true, maxPlaylistRetries: MAX_PLAYLIST_RETRIES },
     nativeAudioTracks: false,
     nativeVideoTracks: false,
   },
 }
+
+/**
+ * How many times a playlist may fail before playback is given up on. VHS
+ * retries a broken playlist for ever when it is the only one it has
+ * (videojs/video.js#5849): `excludePlaylist` returns from its
+ * `playlists.length === 1` branch before `maxPlaylistRetries` is ever read, so
+ * no error is emitted and the page spins. Almost every URL played here is a
+ * single media playlist, so that branch is the normal path, not an edge case.
+ */
+const MAX_PLAYLIST_RETRIES = 3
 
 /** Segment bodies worth unwrapping — never `segment-key`, which is 16 bytes. */
 const SEGMENT_TYPES = new Set(['segment', 'segment-media-initialization'])
@@ -216,6 +228,38 @@ export default function Player() {
       }
     })
     instance.on('error', () => setError(instance.error()?.message || 'Playback failed.'))
+
+    // Count the retries VHS will not count itself, and stop when they run out.
+    // `reset()` tears the tech down, which is what actually ends the loop —
+    // it plays first unless the player is already paused, hence the pause.
+    let retries = 0
+    let guarded = null
+    const onRetry = () => {
+      retries += 1
+      if (retries < MAX_PLAYLIST_RETRIES) return
+      retries = 0
+      // Out of the event dispatch: `reset()` rebuilds the tech, and doing that
+      // while the tech is still delivering this event is its own crash.
+      setTimeout(() => {
+        if (playerRef.current !== instance) return
+        instance.pause()
+        instance.reset()
+        setError('The stream stopped responding after several attempts.')
+      }, 0)
+    }
+    // The tech is rebuilt by `reset()`, so the listener is re-attached per load.
+    const guardTech = () => {
+      const tech = instance.tech({ IWillNotUseThisInPlugins: true })
+      if (!tech || tech === guarded) return
+      guarded = tech
+      tech.on('retryplaylist', onRetry)
+    }
+    instance.on('loadstart', guardTech)
+    // A playlist that loads again clears the tally, so an hour of playback
+    // cannot accumulate unrelated blips into a shutdown.
+    instance.on('playing', () => {
+      retries = 0
+    })
 
     instance.on('loadedmetadata', () => {
       setError('')
