@@ -3,6 +3,8 @@ import { settingsStorage } from '.'
 export const DEFAULT_SETTINGS = {
   /** Sent as the `Referer` header for items that do not carry their own. */
   referer: '',
+  /** Regex matching the URI of an SSAI ad segment; blank strips nothing. */
+  adPattern: '',
   /** Remembered UI state: the Referer last typed into the add form. */
   lastReferer: '',
   /** Take over navigations to a `.m3u8` or `.mpd` URL. */
@@ -27,6 +29,7 @@ export function sanitizeSettings(settings) {
   return {
     ...settings,
     referer: (settings.referer ?? '').trim(),
+    adPattern: (settings.adPattern ?? '').trim(),
     lastReferer: (settings.lastReferer ?? '').trim(),
     autoplay: Boolean(settings.autoplay),
     muted: Boolean(settings.muted),

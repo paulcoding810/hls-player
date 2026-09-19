@@ -10,6 +10,7 @@ export const EMPTY_MOVIE = {
   title: '',
   poster: '',
   referer: '',
+  adPattern: '',
   skipLeading: null,
   skipTrailing: null,
   autoSkip: null,
@@ -136,6 +137,7 @@ export function resumeEpisodeId(movie) {
 export function resolveConfig(movie, settings) {
   return {
     referer: movie?.referer || settings.referer,
+    adPattern: movie?.adPattern || settings.adPattern,
     skipLeading: movie?.skipLeading ?? settings.skipLeading,
     skipTrailing: movie?.skipTrailing ?? settings.skipTrailing,
     autoSkip: movie?.autoSkip ?? settings.autoSkip,

@@ -200,6 +200,55 @@ their PNG signature and unwrapped before playback sees them, so such streams pla
 configuration. The console notes the first segment it unwraps. Segments merely _named_ `.png` with
 ordinary contents never needed anything: playback goes by bytes, not by extension or MIME type.
 
+## Server-side ad insertion
+
+Some sites splice ad segments straight into the media playlist, so there is no URL to block — by
+the time the player sees them the ads are just more `#EXTINF` entries. They usually give
+themselves away in the URI, though. A break looks like this: a run of segments fenced between two
+`#EXT-X-DISCONTINUITY` tags, on a path of their own, with the ragged durations of a spliced ad pod.
+
+```
+#EXTINF:3.0,
+<random-name>.ts                            <- content, the site's own naming
+#EXT-X-DISCONTINUITY
+#EXT-X-KEY:METHOD=NONE
+#EXTINF:3.72,
+/<prefix>/<hash>/segment_0001.ts            <- the ad break: its own path, a dozen
+...                                            segments, ragged durations, ≈30s in all
+#EXTINF:0.16,
+/<prefix>/<hash>/segment_0011.ts
+#EXT-X-DISCONTINUITY
+#EXTINF:3.0,
+<random-name>.ts                            <- content resumes
+```
+
+**Ad segment pattern** — on the movie form, or on the options page as the default every movie
+inherits — is a regular expression matched against each segment URI _as written in the playlist_,
+not the resolved URL. For the break above, `^/<prefix>/[0-9a-f]+/segment_\d+\.ts$` names the ads.
+Every matching segment is cut, along with the tags that describe it, before the playlist is
+parsed.
+
+Mind the direction: the pattern matches what is **thrown away**. Pointing it at the content instead
+leaves you with a playlist of nothing but ads.
+
+The pattern names the **ads**, not the content, so a pattern that is too narrow leaves an ad in
+rather than deleting the movie. A pattern that matches every segment is treated as a mistake and
+ignored. The player reports what it cut — "Removed 12 of 480 segments" — under the field in the
+side panel, which is how you tune it.
+
+Three things worth knowing:
+
+- Only complete (VOD) playlists are rewritten. Removing segments from a live window would shift
+  `#EXT-X-MEDIA-SEQUENCE` out from under the playlist loader.
+- `#EXT-X-KEY` and the other playlist-level tags are always kept, even when they sit inside an ad
+  block — a key applies to everything after it, so dropping one would break the next real segment.
+  A `#EXT-X-DISCONTINUITY` is kept only where the cut actually happened.
+- Cutting ads shortens the timeline, so stored watch positions shift if you change the pattern
+  later. Progress is keyed by episode URL and has no way to know the timeline moved.
+
+DASH is not covered: ad insertion there is a matter of separate periods in the MPD, not segments in
+a playlist.
+
 ## How the Referer override works
 
 `Referer` is a forbidden header for `fetch`/XHR, so it is rewritten at the network layer instead:

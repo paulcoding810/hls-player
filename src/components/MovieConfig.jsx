@@ -4,7 +4,7 @@ import { helpClass, inputClass, labelClass } from './ui'
  * Per-movie overrides. Every field is optional: left blank, the movie inherits
  * the matching value from the global settings.
  */
-export default function MovieConfig({ movie, defaults, onChange, idPrefix = 'movie' }) {
+export default function MovieConfig({ movie, defaults, onChange, idPrefix = 'movie', removed }) {
   const number = (value) => (value === '' ? null : Number(value))
 
   return (
@@ -25,6 +25,26 @@ export default function MovieConfig({ movie, defaults, onChange, idPrefix = 'mov
           Sent with every episode of this movie.
           {defaults.referer && ` Blank uses the default (${defaults.referer})`}
         </p>
+      </div>
+
+      <div>
+        <label className={labelClass} htmlFor={`${idPrefix}-adpattern`}>
+          Ad segment pattern
+        </label>
+        <input
+          id={`${idPrefix}-adpattern`}
+          className={inputClass}
+          spellCheck="false"
+          placeholder="^/ads/.+\\.ts$"
+          value={movie.adPattern ?? ''}
+          onChange={(event) => onChange({ adPattern: event.target.value })}
+        />
+        <p className={helpClass}>
+          Segments whose URI matches this regular expression are cut from the playlist — the pattern
+          names the ads, not the content.
+          {defaults.adPattern && ` Blank uses the default (${defaults.adPattern})`}
+        </p>
+        {removed}
       </div>
 
       <div className="grid grid-cols-2 gap-3">

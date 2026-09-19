@@ -3,6 +3,7 @@ import { useState } from 'react'
 import MovieConfig from './MovieConfig'
 import { buttonClass, ghostButtonClass, helpClass, inputClass, labelClass } from './ui'
 import { EMPTY_MOVIE } from '@/helper/library'
+import { compilePattern } from '@/utils/playlist'
 import { normalizeReferer, parseEpisodeLines } from '@/utils/url'
 
 /**
@@ -16,6 +17,7 @@ export default function MovieFields({
   onCancel,
   autoFocus = false,
   idPrefix = 'movie',
+  removed,
 }) {
   // A new movie starts from the Referer last used, which is usually the same site.
   const [draft, setDraft] = useState({
@@ -47,11 +49,16 @@ export default function MovieFields({
       setError(`${skipped} line(s) are not valid http(s) URLs.`)
       return
     }
+    if (draft.adPattern.trim() && !compilePattern(draft.adPattern.trim())) {
+      setError('The ad segment pattern is not a valid regular expression.')
+      return
+    }
 
     onSave({
       title,
       poster: draft.poster.trim(),
       referer: normalizeReferer(draft.referer),
+      adPattern: draft.adPattern.trim(),
       skipLeading: draft.skipLeading,
       skipTrailing: draft.skipTrailing,
       autoSkip: draft.autoSkip ?? null,
@@ -93,6 +100,7 @@ export default function MovieFields({
         defaults={defaults}
         onChange={(patch) => setDraft({ ...draft, ...patch })}
         idPrefix={idPrefix}
+        removed={removed}
       />
 
       <div>

@@ -20,6 +20,24 @@ export default function SettingsPanel({ settings, onChange }) {
         <p className={helpClass}>Used for items added without their own Referer.</p>
       </div>
 
+      <div>
+        <label className={labelClass} htmlFor="default-adpattern">
+          Default ad segment pattern
+        </label>
+        <input
+          id="default-adpattern"
+          className={inputClass}
+          spellCheck="false"
+          placeholder="^/ads/.+\\.ts$"
+          value={settings.adPattern}
+          onChange={(event) => onChange({ adPattern: event.target.value })}
+        />
+        <p className={helpClass}>
+          Server-side ad segments matching this regular expression are cut from every playlist that
+          does not name its own. Complete (VOD) playlists only.
+        </p>
+      </div>
+
       <div className="grid grid-cols-3 gap-3">
         <div>
           <label className={labelClass} htmlFor="rate">

@@ -126,8 +126,11 @@ the plain `video.js` entry. The playback UI is `src/components/Controls.jsx`, dr
 subscribed to player events; errors surface in the page banner, not over the video. Do not
 re-enable the video.js skin or add a video.js plugin for UI — extend `Controls.jsx`.
 
-VHS response hooks (`videojs.Vhs.xhr.onResponse`) are the extension point for reshaping segment
-bytes — see the PNG unwrapping in `src/player/Player.jsx` with the scanning in
+VHS response hooks (`videojs.Vhs.xhr.onResponse`) have two tenants. Playlist text is rewritten by
+`stripAdSegments()` in `src/utils/playlist.js`, which cuts server-side ad segments named by the
+movie's `adPattern` regex — the loader parses `request.responseText`, and the response hooks run
+first, so the rewrite is shadowed onto the request the same way the segment bytes are. They are
+also the extension point for reshaping segment bytes — see the PNG unwrapping in `src/player/Player.jsx` with the scanning in
 `src/utils/segments.js`. A hook's return value is ignored and the segment loader reads
 `request.response`, so a rewritten buffer has to be shadowed onto the request itself. Request hooks
 cannot set `Referer`; that is a forbidden header and stays with declarativeNetRequest.

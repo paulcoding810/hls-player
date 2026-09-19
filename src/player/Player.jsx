@@ -42,6 +42,7 @@ import { clearProgress, getProgress, saveProgress } from '@/helper/progress'
 import { DEFAULT_SETTINGS, getSettings, sanitizeSettings, saveSettings } from '@/helper/settings'
 import api from '@/utils/api'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
+import { compilePattern, stripAdSegments } from '@/utils/playlist'
 import { stripDecoyPrefix } from '@/utils/segments'
 import { fileNameOf, manifestMime, normalizeSource } from '@/utils/url'
 import './Player.css'
@@ -93,6 +94,10 @@ export default function Player() {
   const playerRef = useRef(null)
   /** Movie config merged over the global settings, for the video callbacks. */
   const configRef = useRef(resolveConfig(null, DEFAULT_SETTINGS))
+  /** Last compiled ad pattern, so a playlist request does not recompile it. */
+  const patternRef = useRef({ source: '', regexp: null })
+  /** What the last rewritten playlist cost, shown under the pattern field. */
+  const [stripped, setStripped] = useState(null)
   const advanceRef = useRef(() => {})
   const hasNextRef = useRef(false)
   /** Guards the automatic outro jump against repeat `timeupdate` calls. */
@@ -173,6 +178,35 @@ export default function Player() {
 
     videojs.Vhs.xhr.onResponse(unwrapSegment)
 
+    // Server-side ad insertion leaves the ads in the playlist, so they come out
+    // of the text before VHS parses it — the loader reads `responseText`, and
+    // the response hooks run first.
+    const stripAds = (request) => {
+      if (request.requestType !== 'hls-playlist') return
+
+      const source = configRef.current.adPattern
+      if (!source) return
+      if (source !== patternRef.current.source) {
+        patternRef.current = { source, regexp: compilePattern(source) }
+      }
+      const { regexp } = patternRef.current
+      if (!regexp) return
+
+      const result = stripAdSegments(request.responseText, regexp)
+      if (!result.removed) return
+
+      Object.defineProperty(request, 'responseText', {
+        value: result.text,
+        configurable: true,
+      })
+      setStripped({ removed: result.removed, total: result.total })
+      console.info(
+        `[hls-player] removed ${result.removed} of ${result.total} segments from ${request.uri}`,
+      )
+    }
+
+    videojs.Vhs.xhr.onResponse(stripAds)
+
     instance.on('play', () => setPlaying(true))
     instance.on('pause', () => {
       setPlaying(false)
@@ -229,6 +263,7 @@ export default function Player() {
 
     return () => {
       videojs.Vhs.xhr.offResponse(unwrapSegment)
+      videojs.Vhs.xhr.offResponse(stripAds)
       instance.dispose()
       playerRef.current = null
       setPlayer(null)
@@ -714,6 +749,14 @@ export default function Player() {
                     movie={movie}
                     defaults={settings}
                     idPrefix="panel"
+                    removed={
+                      stripped && (
+                        <p className="text-ink-muted mt-1 text-xs">
+                          Removed {stripped.removed} of {stripped.total} segments from the last
+                          playlist.
+                        </p>
+                      )
+                    }
                     onSave={saveMovie}
                     onCancel={() => setPanel('episodes')}
                   />

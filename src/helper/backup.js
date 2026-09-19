@@ -61,6 +61,7 @@ function sanitizeMovie(raw) {
     title: string(raw.title).trim() || 'Untitled',
     poster: string(raw.poster),
     referer: string(raw.referer),
+    adPattern: string(raw.adPattern),
     skipLeading: numberOrNull(raw.skipLeading),
     skipTrailing: numberOrNull(raw.skipTrailing),
     autoSkip: typeof raw.autoSkip === 'boolean' ? raw.autoSkip : null,
