@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import ConfirmDialog from '@components/ConfirmDialog'
 import MovieForm from '@components/MovieForm'
-import { EditIcon, FilmIcon, PlayIcon, PlusIcon, TrashIcon } from '@components/icons'
+import { EditIcon, FilmIcon, PlayIcon, PlusIcon, SettingsIcon, TrashIcon } from '@components/icons'
 import { buttonClass, ghostButtonClass, iconButtonClass } from '@components/ui'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
 import {
@@ -17,7 +17,7 @@ import {
   sortedByAdded,
   updateMovie,
 } from '@/helper/library'
-import { playerUrlForEpisode } from '@/helper/player'
+import { openOptions, playerUrlForEpisode } from '@/helper/player'
 import { getAllProgress } from '@/helper/progress'
 import { formatTime } from '@/utils/time'
 
@@ -221,6 +221,15 @@ export default function Gallery() {
         >
           <PlusIcon />
           Add movie
+        </button>
+        <button
+          type="button"
+          onClick={() => openOptions()}
+          className={iconButtonClass}
+          aria-label="Settings"
+          title="Settings"
+        >
+          <SettingsIcon />
         </button>
       </header>
 

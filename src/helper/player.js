@@ -15,6 +15,11 @@ export function playerUrlFor(src) {
   return `${PLAYER_PATH}?src=${encodeURIComponent(src)}`
 }
 
+/** The global defaults live on the options page, not in a page of their own. */
+export function openOptions() {
+  return api.runtime.openOptionsPage()
+}
+
 /**
  * The library is the way in — it carries a Continue watching section for
  * whatever was playing last. Focuses the existing tab when there is one.
