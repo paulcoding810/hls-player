@@ -51,6 +51,9 @@ function read(player) {
   }
 }
 
+/** Matches `.control-range`'s thumb in Controls.css. */
+const THUMB_SIZE = 12
+
 /** Fills the track up to `played`, with the buffered range a shade behind it. */
 function trackBackground(played, buffered) {
   return {
@@ -81,6 +84,8 @@ export default function Controls({
   // Mirrors `scrubbing` for the commit, which runs in a later event and so
   // cannot rely on the state update from this one having rendered yet.
   const pendingSeek = useRef(null)
+  /** Where the pointer sits over the seek bar, as a 0-1 ratio of the track. */
+  const [hover, setHover] = useState(null)
 
   useEffect(() => {
     if (!player) return
@@ -123,6 +128,18 @@ export default function Controls({
     onSeekingChange?.(false)
   }
 
+  // The thumb's centre only spans `width - THUMB_SIZE`, inset by half of it at
+  // each end, so the raw pointer ratio would drift from where the thumb lands.
+  const trackHover = (event) => {
+    if (!seekable) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const usable = rect.width - THUMB_SIZE
+    if (usable <= 0) return
+
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left - THUMB_SIZE / 2) / usable))
+    setHover(ratio)
+  }
+
   const cancelSeek = () => {
     pendingSeek.current = null
     setScrubbing(null)
@@ -131,23 +148,36 @@ export default function Controls({
 
   return (
     <div className="flex flex-col gap-1.5 bg-gradient-to-t from-black/85 to-transparent px-4 pt-8 pb-3">
-      <input
-        type="range"
-        min={0}
-        max={seekable ? state.duration : 1}
-        step={0.1}
-        value={seekable ? position : 0}
-        disabled={!seekable}
-        aria-label="Seek"
-        className="control-range w-full"
-        style={trackBackground(played, buffered)}
-        onPointerDown={startSeek}
-        onChange={moveSeek}
-        onPointerUp={commitSeek}
-        onPointerCancel={cancelSeek}
-        onKeyUp={commitSeek}
-        onBlur={commitSeek}
-      />
+      <div className="relative">
+        {hover !== null && seekable && (
+          <div
+            className="border-line bg-elevated text-ink pointer-events-none absolute bottom-full mb-2 -translate-x-1/2 rounded-md border px-1.5 py-0.5 font-mono text-xs"
+            style={{ left: `calc(${THUMB_SIZE / 2}px + ${hover} * (100% - ${THUMB_SIZE}px))` }}
+            aria-hidden="true"
+          >
+            {formatTime(hover * state.duration)}
+          </div>
+        )}
+        <input
+          type="range"
+          min={0}
+          max={seekable ? state.duration : 1}
+          step={0.1}
+          value={seekable ? position : 0}
+          disabled={!seekable}
+          aria-label="Seek"
+          className="control-range w-full"
+          style={trackBackground(played, buffered)}
+          onPointerDown={startSeek}
+          onChange={moveSeek}
+          onPointerUp={commitSeek}
+          onPointerCancel={cancelSeek}
+          onKeyUp={commitSeek}
+          onBlur={commitSeek}
+          onPointerMove={trackHover}
+          onPointerLeave={() => setHover(null)}
+        />
+      </div>
 
       <div className="text-ink flex items-center gap-2">
         <button
