@@ -159,6 +159,21 @@ Either way the windows are ignored for live streams, where the duration is not f
 outro is neither jumped nor offered on the last episode — there is nothing to skip to, so it plays
 out and reaching the end advances as usual.
 
+## Import and export
+
+**Export data** on the options page writes a JSON file — `hls-player-YYYY-MM-DD.json` — holding
+the library, the global settings and every watch position.
+
+**Import data** merges such a file back in rather than replacing what is there: a movie whose id
+is already in the library is updated from the file, the rest are appended, and a watch position is
+taken only when it is newer than the stored one. The settings in the file replace the current ones.
+Nothing local is lost, so importing twice changes nothing the second time; to restore a backup
+exactly, **Clear library** first and then import.
+
+The file is read defensively, since it is editable: a movie with no playable episode URL is
+dropped, as is any position whose key is not an http(s) URL. A file that is not an export of this
+extension is refused with a message rather than half-applied.
+
 ## Segments disguised as images
 
 Some hosts serve segments as PNGs to dodge filters — a small valid image with the real MPEG-TS or

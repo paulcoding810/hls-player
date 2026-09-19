@@ -149,6 +149,22 @@ export const EditIcon = (props) => (
   </Icon>
 )
 
+export const DownloadIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12 4v11" />
+    <path d="M8 11.5l4 4 4-4" />
+    <path d="M5 19h14" />
+  </Icon>
+)
+
+export const UploadIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12 15V4" />
+    <path d="M8 7.5l4-4 4 4" />
+    <path d="M5 19h14" />
+  </Icon>
+)
+
 export const FilmIcon = (props) => (
   <Icon {...props}>
     <rect x="3" y="5" width="18" height="14" rx="2" />

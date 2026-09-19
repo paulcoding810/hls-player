@@ -13,6 +13,25 @@ async function readAll() {
   return (await progressStorage.get()) || {}
 }
 
+/** Writes the map back, dropping the stalest entries past the cap. */
+async function writeAll(all) {
+  const entries = Object.entries(all)
+  if (entries.length > MAX_ENTRIES) {
+    entries.sort(([, a], [, b]) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+    return progressStorage.setValue(Object.fromEntries(entries.slice(0, MAX_ENTRIES)))
+  }
+  return progressStorage.setValue(all)
+}
+
+/** Folds imported positions in, keeping whichever entry was written last. */
+export async function mergeProgress(incoming) {
+  const all = await readAll()
+  Object.entries(incoming).forEach(([src, entry]) => {
+    if ((entry.updatedAt ?? 0) >= (all[src]?.updatedAt ?? 0)) all[src] = entry
+  })
+  return writeAll(all)
+}
+
 /** The whole map, for views that need many positions at once. */
 export async function getAllProgress() {
   return readAll()
@@ -37,15 +56,7 @@ export async function saveProgress(src, position, duration) {
 
   const all = await readAll()
   all[src] = { position, duration, updatedAt: Date.now() }
-
-  const entries = Object.entries(all)
-  if (entries.length > MAX_ENTRIES) {
-    entries.sort(([, a], [, b]) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
-    await progressStorage.setValue(Object.fromEntries(entries.slice(0, MAX_ENTRIES)))
-    return
-  }
-
-  await progressStorage.setValue(all)
+  await writeAll(all)
 }
 
 export async function clearProgress(src) {

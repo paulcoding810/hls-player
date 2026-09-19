@@ -20,7 +20,9 @@ reads; the player rewrites its own URL with `replaceState` when the episode chan
 icon (`openGallery()`) always lands on the gallery. The data model lives in `src/helper/library.js` — a library holds
 movies, a movie holds episodes plus its own config, and blank config fields (`referer: ''`,
 `skipLeading/skipTrailing: null`) inherit from the global settings via `resolveConfig`. Playback
-positions live in a separate store (`src/helper/progress.js`) keyed by episode URL.
+positions live in a separate store (`src/helper/progress.js`) keyed by episode URL. Both stores,
+plus the settings, round-trip through `src/helper/backup.js` — `readBackup` sanitizes an untrusted
+file and `applyBackup` merges it by movie id, behind the Data section of the options page.
 
 ```shell
 pnpm build            # -> build/chrome
