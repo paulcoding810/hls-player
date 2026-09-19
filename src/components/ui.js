@@ -37,6 +37,13 @@ export const checkboxRowClass = 'flex cursor-pointer items-center gap-2 text-sm 
 export const checkboxClass = 'h-4 w-4 accent-primary'
 
 /*
+  A modal `<dialog>` is centered by the UA stylesheet's `margin: auto`, which
+  Preflight resets away, so `m-auto` puts it back. Sizing stays with the caller.
+*/
+export const dialogClass =
+  'm-auto rounded-md border border-line bg-panel p-5 text-ink shadow-xl backdrop:bg-black/70'
+
+/*
   Banners carry no border of their own — the caller adds the edge it needs
   (`border-b border-line` in a page bar, `rounded-md border border-line` inline)
   so the two never fight over Tailwind's rule order.

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { buttonClass, ghostButtonClass } from './ui'
+import { buttonClass, dialogClass, ghostButtonClass } from './ui'
 
 /**
  * Native `<dialog>`, so focus trapping and Escape come from the platform.
@@ -31,7 +31,7 @@ export default function ConfirmDialog({
       ref={ref}
       onCancel={close(onCancel)}
       aria-labelledby="confirm-title"
-      className="border-line bg-panel text-ink w-[min(26rem,90vw)] rounded-md border p-5 shadow-xl backdrop:bg-black/70"
+      className={`${dialogClass} w-[min(26rem,90vw)]`}
     >
       <h2 id="confirm-title" className="text-sm font-semibold">
         {title}

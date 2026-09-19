@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { buttonClass, ghostButtonClass } from './ui'
+import { buttonClass, dialogClass, ghostButtonClass } from './ui'
 import { PlayIcon } from './icons'
 import { formatTime } from '@/utils/time'
 
@@ -29,7 +29,7 @@ export default function ResumeDialog({ position, duration, onResume, onRestart }
       ref={ref}
       onCancel={close(onRestart)}
       aria-labelledby="resume-title"
-      className="border-line bg-panel text-ink w-[min(26rem,90vw)] rounded-md border p-5 shadow-xl backdrop:bg-black/70"
+      className={`${dialogClass} w-[min(26rem,90vw)]`}
     >
       <h2 id="resume-title" className="text-sm font-semibold">
         Continue watching?
