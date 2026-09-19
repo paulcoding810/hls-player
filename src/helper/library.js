@@ -114,6 +114,17 @@ export async function setLastPlayed(movieId, episodeId) {
   })
 }
 
+/**
+ * Newest first. Movies stored before `addedAt` existed have no timestamp, so
+ * they fall back to their position in the list, which was oldest-first.
+ */
+export function sortedByAdded(movies) {
+  return movies
+    .map((movie, index) => ({ movie, index }))
+    .sort((a, b) => (b.movie.addedAt ?? 0) - (a.movie.addedAt ?? 0) || b.index - a.index)
+    .map((entry) => entry.movie)
+}
+
 /** Where opening a movie should start: where it was left, else the beginning. */
 export function resumeEpisodeId(movie) {
   return findEpisode(movie, movie?.lastEpisodeId)?.id ?? movie?.episodes?.[0]?.id ?? null

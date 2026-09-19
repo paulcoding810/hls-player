@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import ConfirmDialog from '@components/ConfirmDialog'
 import MovieForm from '@components/MovieForm'
@@ -14,6 +14,7 @@ import {
   removeMovie,
   resumeEpisodeId,
   setEpisodes,
+  sortedByAdded,
   updateMovie,
 } from '@/helper/library'
 import { playerUrlForEpisode } from '@/helper/player'
@@ -173,6 +174,8 @@ export default function Gallery() {
     })()
   }, [])
 
+  const movies = useMemo(() => sortedByAdded(library.movies), [library.movies])
+
   const lastMovie = findMovie(library, library.lastPlayed?.movieId)
   const lastEpisode =
     findEpisode(lastMovie, library.lastPlayed?.episodeId) ??
@@ -241,7 +244,7 @@ export default function Gallery() {
         </div>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] content-start gap-4">
-          {library.movies.map((movie) => (
+          {movies.map((movie) => (
             <MovieCard
               key={movie.id}
               movie={movie}
