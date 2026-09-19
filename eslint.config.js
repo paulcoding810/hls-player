@@ -29,6 +29,10 @@ export default [
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       'no-async-promise-executor': 'off',
+      // A module-level const read by an earlier one throws only at run time
+      // (TDZ), so the linter is the one thing that catches it. Function
+      // declarations stay exempt — this file's helpers are hoisted on purpose.
+      'no-use-before-define': ['error', { variables: true, functions: false, classes: false }],
     },
   },
   {

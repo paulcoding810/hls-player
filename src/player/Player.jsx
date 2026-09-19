@@ -48,6 +48,16 @@ import { stripDecoyPrefix } from '@/utils/segments'
 import { fileNameOf, manifestMime, normalizeSource } from '@/utils/url'
 import './Player.css'
 
+/**
+ * How many times a playlist may fail before playback is given up on. VHS
+ * retries a broken playlist for ever when it is the only one it has
+ * (videojs/video.js#5849): `excludePlaylist` returns from its
+ * `playlists.length === 1` branch before `maxPlaylistRetries` is ever read, so
+ * no error is emitted and the page spins. Almost every URL played here is a
+ * single media playlist, so that branch is the normal path, not an edge case.
+ */
+const MAX_PLAYLIST_RETRIES = 3
+
 const VIDEO_JS_OPTIONS = {
   // The playback UI is Controls.jsx — video.js is only the HLS engine here.
   controls: false,
@@ -65,16 +75,6 @@ const VIDEO_JS_OPTIONS = {
     nativeVideoTracks: false,
   },
 }
-
-/**
- * How many times a playlist may fail before playback is given up on. VHS
- * retries a broken playlist for ever when it is the only one it has
- * (videojs/video.js#5849): `excludePlaylist` returns from its
- * `playlists.length === 1` branch before `maxPlaylistRetries` is ever read, so
- * no error is emitted and the page spins. Almost every URL played here is a
- * single media playlist, so that branch is the normal path, not an edge case.
- */
-const MAX_PLAYLIST_RETRIES = 3
 
 /** Segment bodies worth unwrapping — never `segment-key`, which is 16 bytes. */
 const SEGMENT_TYPES = new Set(['segment', 'segment-media-initialization'])
