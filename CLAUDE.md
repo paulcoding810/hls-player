@@ -118,7 +118,11 @@ the movie form itself (`MovieFields.jsx`) renders both as a modal on the library
 the player's side panel.
 
 video.js is the HLS engine only — it is created with `controls: false`, `bigPlayButton: false` and
-`errorDisplay: false`. The playback UI is `src/components/Controls.jsx`, driven by React state
+`errorDisplay: false`. It is imported as `video.js/dist/alt/video.core.js` (a
+`vite.config.js` alias) plus VHS's `videojs-http-streaming-sync-workers.js`: the stock bundle
+builds its transmuxer and decrypter as `blob:` workers, which MV3's `script-src 'self'` forbids —
+Firefox blocks them outright. The sync build runs that same worker code on the page. Do not import
+the plain `video.js` entry. The playback UI is `src/components/Controls.jsx`, driven by React state
 subscribed to player events; errors surface in the page banner, not over the video. Do not
 re-enable the video.js skin or add a video.js plugin for UI — extend `Controls.jsx`.
 

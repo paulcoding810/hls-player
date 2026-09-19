@@ -174,6 +174,24 @@ The file is read defensively, since it is editable: a movie with no playable epi
 dropped, as is any position whose key is not an http(s) URL. A file that is not an export of this
 extension is refused with a message rather than half-applied.
 
+## Why the worker-less video.js build
+
+MV3 pins extension pages to `script-src 'self'`, and neither Chrome nor Firefox lets a manifest
+widen that to `blob:` — the only permitted values are `'self'`, `'none'` and `'wasm-unsafe-eval'`.
+video.js's stock bundle builds the VHS transmuxer and AES decrypter as workers from `blob:` URLs,
+so Firefox refuses them:
+
+```
+Content-Security-Policy: The page's settings blocked a worker script (worker-src) at
+blob:moz-extension://…/… because it violates the following directive: "script-src 'self'"
+```
+
+The extension therefore imports `video.js/dist/alt/video.core.js`, which leaves VHS out, and adds
+VHS back as `videojs-http-streaming-sync-workers.js` — an upstream build that runs the same worker
+code on the page behind a mock `Worker`. Transmuxing MPEG-TS segments now costs main-thread time
+rather than a worker thread; fragmented MP4 and DASH streams are handed to MSE untouched either
+way, so they are unaffected.
+
 ## Segments disguised as images
 
 Some hosts serve segments as PNGs to dodge filters — a small valid image with the real MPEG-TS or

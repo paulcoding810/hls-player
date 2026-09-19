@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import videojs from 'video.js'
+import '@videojs/http-streaming/dist/videojs-http-streaming-sync-workers.js'
 import 'video.js/dist/video-js.css'
 
 import Controls from '@components/Controls'

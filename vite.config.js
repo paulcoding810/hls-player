@@ -29,6 +29,11 @@ export default defineConfig(({ mode }) => {
 
     resolve: {
       alias: [
+        // MV3 forbids `blob:` workers, and VHS builds its transmuxer and
+        // decrypter as ones — Firefox blocks them outright. The core build of
+        // video.js leaves VHS out so the sync-workers build below can supply
+        // it, running the same worker code on the page instead.
+        { find: /^video\.js$/, replacement: 'video.js/dist/alt/video.core.js' },
         { find: '@', replacement: '/src' },
         { find: '@assets', replacement: '/src/assets' },
         { find: '@components', replacement: '/src/components' },
