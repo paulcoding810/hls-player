@@ -16,20 +16,20 @@ hls-player
 ---
 
 <p align="center">
-<a href="https://addons.mozilla.org/en-US/firefox/addon/hls-player/"><img src="https://user-images.githubusercontent.com/585534/107280546-7b9b2a00-6a26-11eb-8f9f-f95932f4bfec.png" alt="Get hls-player for Firefox"></a>
-<a href="https://chromewebstore.google.com/detail/hls-player/chome-id"><img src="https://user-images.githubusercontent.com/585534/107280622-91a8ea80-6a26-11eb-8d07-77c548b28665.png" alt="Get hls-player for Chromium"></a>
+<a href="https://addons.mozilla.org/en-US/firefox/addon/mighty-hls-player/"><img src="https://user-images.githubusercontent.com/585534/107280546-7b9b2a00-6a26-11eb-8f9f-f95932f4bfec.png" alt="Get hls-player for Firefox"></a>
+<a href="https://chromewebstore.google.com/detail/pnbomekpcabpdagnahhmeonjbglglflj"><img src="https://user-images.githubusercontent.com/585534/107280622-91a8ea80-6a26-11eb-8d07-77c548b28665.png" alt="Get hls-player for Chromium"></a>
 </p>
 
 ---
 
-[Mozilla]: https://addons.mozilla.org/en-US/firefox/addon/hls-player/
-[Chrome]: https://chromewebstore.google.com/detail/hls-player/chome-id
+[Mozilla]: https://addons.mozilla.org/en-US/firefox/addon/mighty-hls-player/
+[Chrome]: https://chromewebstore.google.com/detail/pnbomekpcabpdagnahhmeonjbglglflj
 [License]: https://raw.githubusercontent.com/paulcoding810/hls-player/refs/heads/main/LICENSE
 [Commit Rate]: https://github.com/paulcoding810/hls-player/commits/main
 [Issues]: https://github.com/paulcoding810/hls-player/issues
 [Badge Commits]: https://img.shields.io/github/commit-activity/m/paulcoding810/hls-player?label=Commits
-[Badge Mozilla]: https://img.shields.io/amo/v/hls-player
-[Badge Chrome]: https://img.shields.io/chrome-web-store/v/chome-id
+[Badge Mozilla]: https://img.shields.io/amo/v/mighty-hls-player
+[Badge Chrome]: https://img.shields.io/chrome-web-store/v/pnbomekpcabpdagnahhmeonjbglglflj
 [Badge License]: https://img.shields.io/badge/License-MIT-yellow.svg
 [Badge Issues]: https://img.shields.io/github/issues/paulcoding810/hls-player/issues
 
