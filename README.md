@@ -81,6 +81,29 @@ inherits the global default shown in it, so a series that needs a particular `Re
 **Episodes → Edit** opens it in the player's side panel — and **Library** in the player header
 comes back to this page.
 
+### Adding a movie as JSON
+
+**Add movie** opens the form, and **Paste JSON instead** swaps it for a textarea. The shape is the
+one the library stores, so a movie copied out of an export file pastes in unchanged — its `id`,
+`addedAt` and episode ids are ignored and issued fresh:
+
+```json
+{
+  "title": "Example",
+  "referer": "https://example.com/",
+  "skipLeading": 40,
+  "episodes": [
+    "https://example.com/ep1.m3u8",
+    { "title": "Episode 2", "src": "https://example.com/ep2.mpd" }
+  ]
+}
+```
+
+Only `title` and `episodes` are required, and an episode may be a bare URL string or an object
+(`url` works in place of `src`). Everything else — `poster`, `referer`, `adPattern`, `skipLeading`,
+`skipTrailing`, `autoSkip` — is optional and left blank inherits the global default, exactly as the
+form does. A bad field is reported by name rather than silently dropped.
+
 ## Player URLs
 
 The player takes what to play from its query string, so a page can be bookmarked, reloaded or

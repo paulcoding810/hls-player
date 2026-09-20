@@ -1,4 +1,6 @@
 import { libraryStorage } from '.'
+import { compilePattern } from '@/utils/playlist'
+import { normalizeReferer, normalizeSource } from '@/utils/url'
 
 /**
  * A movie owns its episodes and the config they play with. `referer: ''` and
@@ -44,6 +46,64 @@ export function buildEpisodes(sources, offset = 0) {
     title: source.title?.trim() || `Episode ${offset + position + 1}`,
     src: source.src,
   }))
+}
+
+function optionalNumber(value, field) {
+  if (value === null || value === undefined || value === '') return null
+  const number = Number(value)
+  if (!Number.isFinite(number) || number < 0) throw new Error(`"${field}" must be 0 or more.`)
+  return Math.round(number)
+}
+
+/**
+ * Reads a movie from pasted JSON, in the shape the library stores and the
+ * export writes — so a movie lifted out of a backup file pastes straight in.
+ * Throws with a message meant for the person who pasted it.
+ */
+export function parseMovieJson(text) {
+  let raw
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    throw new Error('That is not valid JSON.')
+  }
+  if (Array.isArray(raw) || !raw || typeof raw !== 'object') {
+    throw new Error('Expected a single movie object, like the example below.')
+  }
+
+  const title = typeof raw.title === 'string' ? raw.title.trim() : ''
+  if (!title) throw new Error('Give the movie a "title".')
+
+  // Episodes may be bare URLs or `{ title, src }`; `url` is accepted for `src`
+  // because that is what people reach for.
+  const list = Array.isArray(raw.episodes) ? raw.episodes : []
+  if (!list.length) throw new Error('Add an "episodes" array with at least one URL.')
+
+  const episodes = list.map((entry, position) => {
+    const value = typeof entry === 'string' ? entry : (entry?.src ?? entry?.url)
+    const src = normalizeSource(value)
+    if (!src) throw new Error(`Episode ${position + 1} has no valid http(s) URL.`)
+    return { title: typeof entry?.title === 'string' ? entry.title.trim() : '', src }
+  })
+
+  const adPattern = typeof raw.adPattern === 'string' ? raw.adPattern.trim() : ''
+  if (adPattern && !compilePattern(adPattern)) {
+    throw new Error('"adPattern" is not a valid regular expression.')
+  }
+  if (raw.autoSkip !== undefined && raw.autoSkip !== null && typeof raw.autoSkip !== 'boolean') {
+    throw new Error('"autoSkip" must be true, false or null.')
+  }
+
+  return {
+    title,
+    poster: typeof raw.poster === 'string' ? raw.poster.trim() : '',
+    referer: normalizeReferer(raw.referer),
+    adPattern,
+    skipLeading: optionalNumber(raw.skipLeading, 'skipLeading'),
+    skipTrailing: optionalNumber(raw.skipTrailing, 'skipTrailing'),
+    autoSkip: raw.autoSkip ?? null,
+    episodes,
+  }
 }
 
 export async function addMovie({ episodes = [], ...config }) {

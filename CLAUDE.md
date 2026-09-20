@@ -17,7 +17,8 @@ the gallery when neither resolves. There is no router: the pages hand off by nav
 built with `playerUrlForEpisode()`/`playerUrlFor()` in `src/helper/player.js`. `lastPlayed` in
 storage is the fallback for a bare `player.html` and what the gallery's Continue watching panel
 reads; the player rewrites its own URL with `replaceState` when the episode changes. The toolbar
-icon (`openGallery()`) always lands on the gallery. The data model lives in `src/helper/library.js` — a library holds
+icon (`openGallery()`) always lands on the gallery. The data model lives in `src/helper/library.js` — `parseMovieJson()` there reads that same
+shape back from pasted text for the form's JSON mode. A library holds
 movies, a movie holds episodes plus its own config, and blank config fields (`referer: ''`,
 `skipLeading/skipTrailing: null`) inherit from the global settings via `resolveConfig`. Playback
 positions live in a separate store (`src/helper/progress.js`) keyed by episode URL. Both stores,

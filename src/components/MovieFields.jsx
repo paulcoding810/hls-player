@@ -1,10 +1,27 @@
 import { useState } from 'react'
 
 import MovieConfig from './MovieConfig'
-import { buttonClass, ghostButtonClass, helpClass, inputClass, labelClass } from './ui'
-import { EMPTY_MOVIE } from '@/helper/library'
+import {
+  buttonClass,
+  ghostButtonClass,
+  helpClass,
+  inputClass,
+  labelClass,
+  linkButtonClass,
+} from './ui'
+import { EMPTY_MOVIE, parseMovieJson } from '@/helper/library'
 import { compilePattern } from '@/utils/playlist'
 import { normalizeReferer, parseEpisodeLines } from '@/utils/url'
+
+const JSON_EXAMPLE = `{
+  "title": "Example",
+  "referer": "https://example.com/",
+  "skipLeading": 40,
+  "episodes": [
+    "https://example.com/ep1.m3u8",
+    { "title": "Episode 2", "src": "https://example.com/ep2.mpd" }
+  ]
+}`
 
 /**
  * The movie form itself, with no chrome of its own — `MovieForm` wraps it in a
@@ -31,6 +48,9 @@ export default function MovieFields({
     (movie?.episodes ?? []).map((episode) => `${episode.title} | ${episode.src}`).join('\n'),
   )
   const [error, setError] = useState('')
+  // Pasting is an alternative to filling the form, so it is offered only when
+  // adding — editing already has the saved values laid out in the fields.
+  const [json, setJson] = useState(null)
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -64,6 +84,68 @@ export default function MovieFields({
       autoSkip: draft.autoSkip ?? null,
       episodes,
     })
+  }
+
+  const handleJsonSubmit = (event) => {
+    event.preventDefault()
+    try {
+      onSave(parseMovieJson(json))
+    } catch (jsonError) {
+      setError(jsonError.message)
+    }
+  }
+
+  const actions = (
+    <div className="flex items-center justify-end gap-2">
+      {!movie && (
+        <button
+          type="button"
+          className={`${linkButtonClass} mr-auto`}
+          onClick={() => {
+            setError('')
+            setJson(json === null ? '' : null)
+          }}
+        >
+          {json === null ? 'Paste JSON instead' : 'Use the form instead'}
+        </button>
+      )}
+      <button type="button" onClick={onCancel} className={ghostButtonClass}>
+        Cancel
+      </button>
+      <button type="submit" className={buttonClass}>
+        {movie ? 'Save' : 'Add movie'}
+      </button>
+    </div>
+  )
+
+  if (json !== null) {
+    return (
+      <form onSubmit={handleJsonSubmit} className="flex flex-col gap-4">
+        <div>
+          <label className={labelClass} htmlFor={`${idPrefix}-json`}>
+            Movie JSON
+          </label>
+          <textarea
+            id={`${idPrefix}-json`}
+            rows={12}
+            spellCheck="false"
+            autoFocus
+            className={`${inputClass} resize-y font-mono text-xs`}
+            placeholder={JSON_EXAMPLE}
+            value={json}
+            onChange={(event) => setJson(event.target.value)}
+          />
+          <p className={helpClass}>
+            Only <code>title</code> and <code>episodes</code> are required; an episode may be a bare
+            URL string. A movie copied out of an export file pastes in as it is.
+          </p>
+        </div>
+
+        {error && <p className="text-danger text-xs">{error}</p>}
+
+        {actions}
+      </form>
+    )
   }
 
   return (
@@ -125,14 +207,7 @@ export default function MovieFields({
 
       {error && <p className="text-danger text-xs">{error}</p>}
 
-      <div className="flex items-center justify-end gap-2">
-        <button type="button" onClick={onCancel} className={ghostButtonClass}>
-          Cancel
-        </button>
-        <button type="submit" className={buttonClass}>
-          {movie ? 'Save' : 'Add movie'}
-        </button>
-      </div>
+      {actions}
     </form>
   )
 }
