@@ -1,7 +1,7 @@
 {
   "name": "hls-player",
   "displayName": "HLS Player",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "author": "paulcoding",
   "description": "Play HLS (.m3u8) and DASH (.mpd) streams with a custom Referer",
   "type": "module",
