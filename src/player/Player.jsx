@@ -677,8 +677,6 @@ export default function Player() {
   }
 
   const showControls = !playing || pointerActive || seeking
-  // The editor must not vanish mid-typing, so only the episode list fades.
-  const panelVisible = showControls || panel === 'edit'
 
   return (
     <>
@@ -842,9 +840,7 @@ export default function Player() {
                 setPointerActive(true)
               }}
               onPointerLeave={wake}
-              className={`border-line bg-panel/95 absolute inset-y-0 right-0 z-10 flex w-80 max-w-[85%] flex-col gap-4 overflow-y-auto border-l p-4 pb-24 backdrop-blur-sm transition-opacity duration-200 ${
-                panelVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
-              }`}
+              className="border-line bg-panel/95 absolute inset-y-0 right-0 z-10 flex w-80 max-w-[85%] flex-col gap-4 overflow-y-auto border-l p-4 pb-24 backdrop-blur-sm"
             >
               {panel === 'edit' ? (
                 <>

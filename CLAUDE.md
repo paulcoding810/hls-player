@@ -151,7 +151,9 @@ Every control carries `aria-label`, and `title` names its keyboard shortcut wher
 - `rounded-md` everywhere; `rounded-full` only for genuinely circular controls.
 - Separate regions with a single `border-line` edge, not shadows or nested cards.
 - Side panels are `w-80` and **overlay** the video (`absolute inset-y-0 right-0`, translucent
-  `bg-panel/95` + `backdrop-blur-sm`), scrolling internally. They must never take layout space:
+  `bg-panel/95` + `backdrop-blur-sm`), scrolling internally. The player's panel opens and closes on
+  its **Episodes** button alone — it does not follow the control bar's idle fade, so choosing an
+  episode or editing a movie is never interrupted. They must never take layout space:
   resizing the video element restarts quality selection and makes playback stutter. Anything
   anchored over the video (the control bar, centered affordances) keeps clear of the open panel
   rather than sitting under it.
