@@ -1,4 +1,4 @@
-import { FilmIcon, PlusIcon } from './icons'
+import { FilmIcon, PlayIcon, PlusIcon } from './icons'
 import { dangerBannerClass, ghostButtonClass } from './ui'
 
 /**
@@ -6,7 +6,7 @@ import { dangerBannerClass, ghostButtonClass } from './ui'
  * from. A source that failed keeps its group and shows why, so a broken one is
  * visible rather than silently missing.
  */
-export default function SearchResults({ groups, busy, added, adding, onAdd }) {
+export default function SearchResults({ groups, busy, added, adding, onAdd, onWatch }) {
   const total = groups.reduce((count, group) => count + group.results.length, 0)
 
   if (busy) return <p className="text-ink-faint text-sm">Searching…</p>
@@ -31,6 +31,9 @@ export default function SearchResults({ groups, busy, added, adding, onAdd }) {
 
           {group.results.map((result) => {
             const key = `${group.plugin.id}:${result.id}`
+            // Already in the library: the useful action is to watch it, not to
+            // be told it is there.
+            const movie = added.get(key)
             return (
               <article
                 key={key}
@@ -50,15 +53,22 @@ export default function SearchResults({ groups, busy, added, adding, onAdd }) {
                   {result.title}
                 </h3>
 
-                <button
-                  type="button"
-                  onClick={() => onAdd(group.plugin, result)}
-                  disabled={added.has(key) || adding === key}
-                  className={ghostButtonClass}
-                >
-                  <PlusIcon className="h-3.5 w-3.5" />
-                  {added.has(key) ? 'Added' : adding === key ? 'Adding…' : 'Add'}
-                </button>
+                {movie ? (
+                  <button type="button" onClick={() => onWatch(movie)} className={ghostButtonClass}>
+                    <PlayIcon className="h-3.5 w-3.5" />
+                    Watch
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onAdd(group.plugin, result)}
+                    disabled={adding === key}
+                    className={ghostButtonClass}
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    {adding === key ? 'Adding…' : 'Add'}
+                  </button>
+                )}
               </article>
             )
           })}

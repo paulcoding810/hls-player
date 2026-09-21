@@ -241,13 +241,13 @@ export default function Gallery() {
 
   const refresh = async () => setLibrary(await getLibrary())
 
-  /** Which results are already in the library, so they show as Added. */
+  /** Results already in the library, keyed so they offer Watch instead of Add. */
   const added = useMemo(
     () =>
-      new Set(
+      new Map(
         library.movies
           .filter((movie) => movie.source)
-          .map((movie) => `${movie.source.pluginId}:${movie.source.itemId}`),
+          .map((movie) => [`${movie.source.pluginId}:${movie.source.itemId}`, movie]),
       ),
     [library.movies],
   )
@@ -403,6 +403,7 @@ export default function Gallery() {
           added={added}
           adding={adding}
           onAdd={addResult}
+          onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
         />
       ) : (
         <>
