@@ -149,6 +149,20 @@ export const EditIcon = (props) => (
   </Icon>
 )
 
+export const SearchIcon = (props) => (
+  <Icon {...props}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="M16 16l3.5 3.5" />
+  </Icon>
+)
+
+export const RefreshIcon = (props) => (
+  <Icon {...props}>
+    <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+    <path d="M19.5 4v4.5H15" />
+  </Icon>
+)
+
 export const DownloadIcon = (props) => (
   <Icon {...props}>
     <path d="M12 4v11" />

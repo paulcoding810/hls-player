@@ -1,11 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 
 import ConfirmDialog from '@components/ConfirmDialog'
+import PluginForm from '@components/PluginForm'
 import SettingsPanel from '@components/SettingsPanel'
-import { AlertIcon, DownloadIcon, LibraryIcon, TrashIcon, UploadIcon } from '@components/icons'
-import { buttonClass, dangerBannerClass, ghostButtonClass, warnBannerClass } from '@components/ui'
+import {
+  AlertIcon,
+  DownloadIcon,
+  EditIcon,
+  LibraryIcon,
+  PlusIcon,
+  TrashIcon,
+  UploadIcon,
+} from '@components/icons'
+import {
+  buttonClass,
+  checkboxClass,
+  dangerBannerClass,
+  ghostButtonClass,
+  iconButtonClass,
+  warnBannerClass,
+} from '@components/ui'
 import { applyBackup, backupFileName, buildBackup, readBackup } from '@/helper/backup'
 import { clearLibrary, getLibrary } from '@/helper/library'
+import { addPlugin, getPlugins, removePlugin, updatePlugin } from '@/helper/plugins'
 import { openGallery } from '@/helper/player'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
@@ -24,18 +41,23 @@ export const Options = () => {
   /** The parsed file, held until the import is confirmed. */
   const [pending, setPending] = useState(null)
   const [notice, setNotice] = useState(null)
+  const [plugins, setPlugins] = useState([])
+  /** A plugin id, or `new` while adding one. */
+  const [editing, setEditing] = useState(null)
   const fileRef = useRef(null)
 
   useEffect(() => {
     ;(async () => {
-      const [storedSettings, library, permission] = await Promise.all([
+      const [storedSettings, library, permission, storedPlugins] = await Promise.all([
         getSettings(),
         getLibrary(),
         hasHostPermission(),
+        getPlugins(),
       ])
       setSettings(storedSettings)
       setStats({ movies: library.movies.length, episodes: countEpisodes(library) })
       setGranted(permission)
+      setPlugins(storedPlugins)
     })()
   }, [])
 
@@ -80,11 +102,33 @@ export const Options = () => {
     setPending(null)
     setSettings(await getSettings())
     setStats({ movies: library.movies.length, episodes: countEpisodes(library) })
+    setPlugins(await getPlugins())
     setNotice({
       tone: 'warn',
-      message: `Imported ${result.added} new movie(s), updated ${result.updated}, and merged ${result.positions} watch position(s).`,
+      message:
+        `Imported ${result.added} new movie(s), updated ${result.updated}, ` +
+        `merged ${result.positions} watch position(s) and ${result.plugins} source(s).`,
     })
   }
+
+  const savePlugin = async (values) => {
+    if (editing === 'new') await addPlugin(values)
+    else await updatePlugin(editing, values)
+    setPlugins(await getPlugins())
+    setEditing(null)
+  }
+
+  const togglePlugin = async (plugin) => {
+    await updatePlugin(plugin.id, { enabled: !plugin.enabled })
+    setPlugins(await getPlugins())
+  }
+
+  const deletePlugin = async (plugin) => {
+    await removePlugin(plugin.id)
+    setPlugins(await getPlugins())
+  }
+
+  const editingPlugin = plugins.find((plugin) => plugin.id === editing) ?? null
 
   return (
     <main className="mx-auto max-w-2xl p-6">
@@ -111,10 +155,68 @@ export const Options = () => {
       <SettingsPanel settings={settings} onChange={update} />
 
       <section className="border-line mt-8 border-t pt-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold">Sources</h2>
+          <button
+            type="button"
+            onClick={() => setEditing('new')}
+            className={`${ghostButtonClass} ml-auto`}
+          >
+            <PlusIcon />
+            Add source
+          </button>
+        </div>
+        <p className="text-ink-faint mt-1 text-xs">
+          A source describes one site&apos;s JSON API — a search URL, a details URL, and where the
+          values sit in each response. The library&apos;s search bar queries every enabled one.
+        </p>
+
+        {plugins.length === 0 ? (
+          <p className="text-ink-muted mt-3 text-sm">No sources yet.</p>
+        ) : (
+          <ul className="border-line mt-3 divide-y divide-[var(--color-line)] rounded-md border">
+            {plugins.map((plugin) => (
+              <li key={plugin.id} className="flex items-center gap-3 px-3 py-2">
+                <input
+                  type="checkbox"
+                  className={checkboxClass}
+                  checked={plugin.enabled}
+                  onChange={() => togglePlugin(plugin)}
+                  aria-label={`Search ${plugin.name}`}
+                  title={`Search ${plugin.name}`}
+                />
+                <span className="min-w-0 flex-1 truncate text-sm" title={plugin.search.url}>
+                  {plugin.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEditing(plugin.id)}
+                  className={iconButtonClass}
+                  aria-label={`Edit ${plugin.name}`}
+                  title="Edit"
+                >
+                  <EditIcon />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deletePlugin(plugin)}
+                  className={iconButtonClass}
+                  aria-label={`Delete ${plugin.name}`}
+                  title="Delete"
+                >
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="border-line mt-8 border-t pt-4">
         <h2 className="text-sm font-semibold">Data</h2>
         <p className="text-ink-faint mt-1 text-xs">
-          The export holds the library, the settings and every watch position. Importing merges it
-          in: a movie already here is updated, the rest are added.
+          The export holds the library, the sources, the settings and every watch position.
+          Importing merges it in: a movie or source already here is updated, the rest are added.
         </p>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -167,6 +269,10 @@ export const Options = () => {
             : `${stats.movies} movie(s), ${stats.episodes} episode(s).`}
         </p>
       </section>
+
+      {editing && (
+        <PluginForm plugin={editingPlugin} onSave={savePlugin} onClose={() => setEditing(null)} />
+      )}
 
       {pending && (
         <ConfirmDialog

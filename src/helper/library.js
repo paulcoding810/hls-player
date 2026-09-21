@@ -13,6 +13,8 @@ export const EMPTY_MOVIE = {
   poster: '',
   referer: '',
   adPattern: '',
+  /** `{ pluginId, itemId }` when a source plugin added it, else null. */
+  source: null,
   skipLeading: null,
   skipTrailing: null,
   autoSkip: null,

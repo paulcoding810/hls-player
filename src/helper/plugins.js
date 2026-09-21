@@ -1,0 +1,168 @@
+import { pluginStorage } from '.'
+import { setEpisodes } from './library'
+import { fillTemplate, readPath } from '@/utils/jsonPath'
+import { normalizeSource } from '@/utils/url'
+
+/**
+ * A source plugin is the user's description of one site's JSON API — two URL
+ * templates and the paths its values sit at. It holds no code: MV3 forbids
+ * running any, so extraction is data. See `src/utils/jsonPath.js`.
+ */
+export const EMPTY_PLUGIN = {
+  name: '',
+  enabled: true,
+  /** Inherited by movies added from this source, for playback. */
+  referer: '',
+  search: { url: '', list: '', fields: { id: '', title: '', poster: '' } },
+  details: { url: '', episodes: '', fields: { title: '', src: '' } },
+}
+
+/** A dead host must not hang the search. */
+const TIMEOUT = 10_000
+
+export async function getPlugins() {
+  const stored = (await pluginStorage.get()) || {}
+  return Array.isArray(stored.items) ? stored.items : []
+}
+
+export async function savePlugins(items) {
+  await pluginStorage.setValue({ items })
+  return items
+}
+
+export async function addPlugin(config) {
+  const plugins = await getPlugins()
+  const plugin = { ...EMPTY_PLUGIN, ...config, id: crypto.randomUUID() }
+  await savePlugins([...plugins, plugin])
+  return plugin
+}
+
+export async function updatePlugin(pluginId, patch) {
+  const plugins = await getPlugins()
+  return savePlugins(
+    plugins.map((plugin) =>
+      plugin.id === pluginId ? { ...plugin, ...patch, id: plugin.id } : plugin,
+    ),
+  )
+}
+
+export async function removePlugin(pluginId) {
+  return savePlugins((await getPlugins()).filter((plugin) => plugin.id !== pluginId))
+}
+
+function text(value) {
+  return typeof value === 'string' || typeof value === 'number' ? String(value).trim() : ''
+}
+
+async function fetchJson(url, label) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT)
+  try {
+    // Each failure is caught where it happens, so a message this function
+    // writes is never caught and labelled a second time on the way out.
+    let response
+    try {
+      response = await fetch(url, { signal: controller.signal })
+    } catch (error) {
+      throw new Error(
+        error.name === 'AbortError'
+          ? `${label} did not answer in time.`
+          : `${label}: ${error.message}`,
+      )
+    }
+
+    if (!response.ok) throw new Error(`${label} answered ${response.status}.`)
+
+    try {
+      return await response.json()
+    } catch {
+      throw new Error(`${label} did not return JSON.`)
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** The array a `list`/`episodes` path points at, or an empty one. */
+function listAt(payload, path) {
+  const found = readPath(payload, path)
+  return Array.isArray(found) ? found : []
+}
+
+/** A field is a path into the entry, unless it holds `{`, which makes it a template. */
+function valueOf(entry, path) {
+  if (!String(path).includes('{')) return readPath(entry, path)
+
+  const filled = fillTemplate(path, entry)
+  // A placeholder still standing means the entry had nothing for it. Returning
+  // the half-built string would be worse than nothing: `new URL` accepts
+  // `https://host/{path}.m3u8`, so it would pass for a real episode URL.
+  return /\{\w+\}/.test(filled) ? '' : filled
+}
+
+function extract(entry, fields) {
+  return Object.fromEntries(
+    Object.entries(fields ?? {}).map(([name, path]) => [name, text(valueOf(entry, path))]),
+  )
+}
+
+export async function searchPlugin(plugin, query) {
+  const url = fillTemplate(plugin.search?.url, { query })
+  const payload = await fetchJson(url, plugin.name || 'The source')
+
+  return (
+    listAt(payload, plugin.search?.list)
+      .map((entry) => ({ ...extract(entry, plugin.search?.fields), plugin }))
+      // Half a result is worse than none: it could neither be shown nor fetched.
+      .filter((result) => result.id && result.title)
+  )
+}
+
+/** Episodes for one search result, ready for `addMovie`/`setEpisodes`. */
+export async function fetchEpisodes(plugin, item) {
+  const url = fillTemplate(plugin.details?.url, item)
+  const payload = await fetchJson(url, plugin.name || 'The source')
+
+  return listAt(payload, plugin.details?.episodes)
+    .map((entry) => {
+      const fields = extract(entry, plugin.details?.fields)
+      return { title: fields.title, src: normalizeSource(fields.src) }
+    })
+    .filter((episode) => episode.src)
+}
+
+/**
+ * Every enabled source at once. One that fails comes back with its `error` set
+ * rather than taking the others down with it.
+ */
+export async function searchAll(plugins, query) {
+  const enabled = plugins.filter((plugin) => plugin.enabled)
+
+  return Promise.all(
+    enabled.map(async (plugin) => {
+      try {
+        return { plugin, results: await searchPlugin(plugin, query), error: '' }
+      } catch (error) {
+        return { plugin, results: [], error: error.message }
+      }
+    }),
+  )
+}
+
+/**
+ * Re-reads a plugin-backed movie's episodes. `setEpisodes` keeps the id of any
+ * URL still present, so `lastEpisodeId` and every stored watch position ride
+ * through; nothing the user edited — title, poster, config — is touched.
+ */
+export async function refreshMovie(movie, plugins) {
+  const plugin = plugins.find((item) => item.id === movie.source?.pluginId)
+  if (!plugin) throw new Error('The source this movie came from is gone.')
+
+  const episodes = await fetchEpisodes(plugin, { id: movie.source.itemId })
+  if (!episodes.length) throw new Error(`${plugin.name || 'The source'} returned no episodes.`)
+
+  const known = new Set(movie.episodes.map((episode) => episode.src))
+  await setEpisodes(movie.id, episodes)
+
+  return { added: episodes.filter((episode) => !known.has(episode.src)).length }
+}

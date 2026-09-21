@@ -23,7 +23,12 @@ movies, a movie holds episodes plus its own config, and it carries three timesta
 `sortMovies()` reads — `addedAt`, `updatedAt` (stamped by `updateMovie`) and `lastPlayedAt`
 (stamped by `setLastPlayed`); sorting never rewrites the stored order. Blank config fields (`referer: ''`,
 `skipLeading/skipTrailing: null`) inherit from the global settings via `resolveConfig`. Playback
-positions live in a separate store (`src/helper/progress.js`) keyed by episode URL. Both stores,
+positions live in a separate store (`src/helper/progress.js`) keyed by episode URL. Source plugins live in a
+fourth store (`src/helper/plugins.js`): each one describes a site's JSON API as two URL templates
+plus paths, read by `readPath`/`fillTemplate` in `src/utils/jsonPath.js`. A plugin can never hold
+code — MV3 forbids `eval`, so extraction is data; do not "simplify" it into a callback. A movie
+added from one carries `source: { pluginId, itemId }`, which is what the gallery's refresh button
+uses to re-read episodes through the existing `setEpisodes`. All three stores,
 plus the settings, round-trip through `src/helper/backup.js` — `readBackup` sanitizes an untrusted
 file and `applyBackup` merges it by movie id, behind the Data section of the options page.
 

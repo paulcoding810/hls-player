@@ -2,8 +2,25 @@ import { useEffect, useMemo, useState } from 'react'
 
 import ConfirmDialog from '@components/ConfirmDialog'
 import MovieForm from '@components/MovieForm'
-import { EditIcon, FilmIcon, PlayIcon, PlusIcon, SettingsIcon, TrashIcon } from '@components/icons'
-import { buttonClass, ghostButtonClass, iconButtonClass, selectClass } from '@components/ui'
+import SearchResults from '@components/SearchResults'
+import {
+  EditIcon,
+  FilmIcon,
+  PlayIcon,
+  PlusIcon,
+  RefreshIcon,
+  SearchIcon,
+  SettingsIcon,
+  TrashIcon,
+} from '@components/icons'
+import {
+  buttonClass,
+  dangerBannerClass,
+  ghostButtonClass,
+  iconButtonClass,
+  inputClass,
+  selectClass,
+} from '@components/ui'
 import { SORT_ORDERS } from '@/helper/constants'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
 import {
@@ -19,6 +36,8 @@ import {
   updateMovie,
 } from '@/helper/library'
 import { openOptions, playerUrlForEpisode } from '@/helper/player'
+import { addMovie as addLibraryMovie } from '@/helper/library'
+import { fetchEpisodes, getPlugins, refreshMovie, searchAll } from '@/helper/plugins'
 import { getAllProgress } from '@/helper/progress'
 import { formatTime } from '@/utils/time'
 
@@ -36,7 +55,7 @@ function ProgressBar({ percent, className = '' }) {
   )
 }
 
-function MovieCard({ movie, positions = {}, onPlay, onEdit, onDelete }) {
+function MovieCard({ movie, positions = {}, onPlay, onEdit, onDelete, onRefresh, refreshing }) {
   const resumeId = resumeEpisodeId(movie)
   const resumeIndex = movie.episodes.findIndex((episode) => episode.id === resumeId)
   const resumeEpisode = movie.episodes[resumeIndex]
@@ -86,10 +105,22 @@ function MovieCard({ movie, positions = {}, onPlay, onEdit, onDelete }) {
             <PlayIcon className="h-3.5 w-3.5" />
             {started ? 'Resume' : 'Play'}
           </button>
+          {movie.source && (
+            <button
+              type="button"
+              onClick={() => onRefresh(movie)}
+              disabled={refreshing}
+              className={`${iconButtonClass} ml-auto`}
+              aria-label={`Refresh ${movie.title}`}
+              title="Check the source for new episodes"
+            >
+              <RefreshIcon />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onEdit(movie.id)}
-            className={`${iconButtonClass} ml-auto`}
+            className={`${iconButtonClass} ${movie.source ? '' : 'ml-auto'}`}
             aria-label={`Edit ${movie.title}`}
             title="Edit movie"
           >
@@ -165,11 +196,25 @@ export default function Gallery() {
   /** Stored positions keyed by episode URL. */
   const [positions, setPositions] = useState({})
 
+  const [plugins, setPlugins] = useState([])
+  const [query, setQuery] = useState('')
+  /** Null until a search has run; then one group per enabled source. */
+  const [groups, setGroups] = useState(null)
+  const [searching, setSearching] = useState(false)
+  /** `pluginId:itemId` of the result being added, and a page-level error. */
+  const [adding, setAdding] = useState('')
+  const [notice, setNotice] = useState('')
+
   useEffect(() => {
     ;(async () => {
-      const [storedLibrary, storedSettings] = await Promise.all([getLibrary(), getSettings()])
+      const [storedLibrary, storedSettings, storedPlugins] = await Promise.all([
+        getLibrary(),
+        getSettings(),
+        getPlugins(),
+      ])
       setLibrary(storedLibrary)
       setSettings(storedSettings)
+      setPlugins(storedPlugins)
 
       setPositions(await getAllProgress())
     })()
@@ -195,6 +240,75 @@ export default function Gallery() {
   const deletingMovie = library.movies.find((movie) => movie.id === deleting) ?? null
 
   const refresh = async () => setLibrary(await getLibrary())
+
+  /** Which results are already in the library, so they show as Added. */
+  const added = useMemo(
+    () =>
+      new Set(
+        library.movies
+          .filter((movie) => movie.source)
+          .map((movie) => `${movie.source.pluginId}:${movie.source.itemId}`),
+      ),
+    [library.movies],
+  )
+
+  const runSearch = async (event) => {
+    event.preventDefault()
+    const term = query.trim()
+    if (!term) {
+      setGroups(null)
+      return
+    }
+
+    setNotice('')
+    setSearching(true)
+    try {
+      setGroups(await searchAll(plugins, term))
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const addResult = async (plugin, result) => {
+    const key = `${plugin.id}:${result.id}`
+    setAdding(key)
+    setNotice('')
+    try {
+      const episodes = await fetchEpisodes(plugin, result)
+      if (!episodes.length) throw new Error(`${plugin.name} returned no episodes for this title.`)
+
+      await addLibraryMovie({
+        title: result.title,
+        poster: result.poster,
+        referer: plugin.referer,
+        episodes,
+        source: { pluginId: plugin.id, itemId: result.id },
+      })
+      await refresh()
+    } catch (error) {
+      setNotice(error.message)
+    } finally {
+      setAdding('')
+    }
+  }
+
+  const handleRefresh = async (movie) => {
+    setAdding(movie.id)
+    setNotice('')
+    try {
+      const { added: fresh } = await refreshMovie(movie, plugins)
+      await refresh()
+      setNotice(
+        fresh
+          ? `${movie.title}: ${fresh} new episode(s).`
+          : `${movie.title} is already up to date.`,
+      )
+    } catch (error) {
+      setNotice(error.message)
+    } finally {
+      setAdding('')
+    }
+  }
 
   const handleSave = async ({ episodes, ...config }) => {
     if (editing === 'new') {
@@ -256,37 +370,76 @@ export default function Gallery() {
         </button>
       </header>
 
-      {lastMovie && lastEpisode && (
-        <ContinueWatching
-          movie={lastMovie}
-          episode={lastEpisode}
-          progress={positions[lastEpisode.src]}
-          onPlay={play}
-        />
+      {plugins.some((plugin) => plugin.enabled) && (
+        <form onSubmit={runSearch} className="mb-6 flex items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              // Emptying the box puts the library back.
+              if (!event.target.value.trim()) setGroups(null)
+            }}
+            placeholder="Search your sources…"
+            aria-label="Search sources"
+            className={inputClass}
+          />
+          <button type="submit" disabled={!query.trim()} className={ghostButtonClass}>
+            <SearchIcon className="h-3.5 w-3.5" />
+            Search
+          </button>
+        </form>
       )}
 
-      {library.movies.length === 0 ? (
-        <div className="text-ink-faint flex flex-1 flex-col items-center justify-center gap-3">
-          <FilmIcon className="h-10 w-10" />
-          <p className="text-sm">No movies yet.</p>
-          <button type="button" onClick={() => setEditing('new')} className={buttonClass}>
-            <PlusIcon />
-            Add your first movie
-          </button>
-        </div>
+      {notice && (
+        <p className={`${dangerBannerClass} border-line mb-6 rounded-md border`}>{notice}</p>
+      )}
+
+      {groups !== null ? (
+        <SearchResults
+          groups={groups}
+          busy={searching}
+          added={added}
+          adding={adding}
+          onAdd={addResult}
+        />
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] content-start gap-4">
-          {movies.map((movie) => (
-            <MovieCard
-              key={movie.id}
-              movie={movie}
-              positions={positions}
+        <>
+          {lastMovie && lastEpisode && (
+            <ContinueWatching
+              movie={lastMovie}
+              episode={lastEpisode}
+              progress={positions[lastEpisode.src]}
               onPlay={play}
-              onEdit={setEditing}
-              onDelete={setDeleting}
             />
-          ))}
-        </div>
+          )}
+
+          {library.movies.length === 0 ? (
+            <div className="text-ink-faint flex flex-1 flex-col items-center justify-center gap-3">
+              <FilmIcon className="h-10 w-10" />
+              <p className="text-sm">No movies yet.</p>
+              <button type="button" onClick={() => setEditing('new')} className={buttonClass}>
+                <PlusIcon />
+                Add your first movie
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] content-start gap-4">
+              {movies.map((movie) => (
+                <MovieCard
+                  key={movie.id}
+                  movie={movie}
+                  positions={positions}
+                  onPlay={play}
+                  onEdit={setEditing}
+                  onDelete={setDeleting}
+                  onRefresh={handleRefresh}
+                  refreshing={adding === movie.id}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {editing && (

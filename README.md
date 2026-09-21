@@ -123,6 +123,66 @@ Only `title` and `episodes` are required, and an episode may be a bare URL strin
 `skipTrailing`, `autoSkip` — is optional and left blank inherits the global default, exactly as the
 form does. A bad field is reported by name rather than silently dropped.
 
+## Sources
+
+A **source** describes one site's JSON API so the library can search it directly instead of you
+pasting every episode URL. Sources are managed on the options page, and once one is enabled the
+library grows a search bar: type a title, pick a result, and its episodes arrive filled in.
+
+A source holds no code. MV3 pins extension pages to `script-src 'self'` with no `unsafe-eval`, so
+there is no way to run a parse function you supply — the same rule behind the worker-less video.js
+build below. Instead you say _where_ the values are:
+
+```json
+{
+  "name": "Example",
+  "referer": "https://example.com/",
+  "search": {
+    "url": "https://api.example.com/search?q={query}",
+    "list": "data.items",
+    "fields": { "id": "vod_id", "title": "vod_name", "poster": "vod_pic" }
+  },
+  "details": {
+    "url": "https://api.example.com/detail/{id}",
+    "episodes": "data.play[0].list",
+    "fields": { "title": "name", "src": "https://cdn.example.com/{path}.m3u8" }
+  }
+}
+```
+
+- **Paths** are dots and `[0]` indices — `data.play[0].list`. A path that matches nothing yields
+  nothing rather than an error, so a wrong one shows up as an empty result, not a crash.
+- **Templates** substitute `{name}` from the entry being read. `{query}` is percent-encoded
+  because it is free text you typed; every other placeholder goes in raw, since those are path
+  fragments the API returned. A field whose template still has an unfilled placeholder is dropped
+  rather than half-built.
+- A field is treated as a template if it contains `{`, and as a path otherwise — so `src` can be
+  either `url` (a path to a ready-made URL) or the template above.
+
+**Test** in the source form runs a real search for "test" and shows what it extracted. Getting the
+paths right against someone else's JSON is the fiddly part; this is how you do it without guessing.
+
+Searching queries every enabled source at once and groups the results. A source that fails shows
+its error in its own group instead of taking the search down. A result already in the library
+reads **Added**.
+
+### Refreshing
+
+A movie added from a source remembers where it came from and carries a refresh button. It
+re-reads the details endpoint and updates **the episode list only** — your title, poster, Referer,
+skip windows and ad pattern are yours and are never overwritten. Episodes whose URL is unchanged
+keep their identity, so watch positions and "last episode" survive a refresh.
+
+### Limits
+
+- **JSON only.** A site that returns HTML cannot be scraped; that needs exactly the code execution
+  MV3 forbids.
+- **No `Referer` on the API call.** `Referer` is a forbidden header for `fetch`, just as it is for
+  the player's XHR — which is why playback uses declarativeNetRequest instead. A source's
+  `Referer` is given to the movies it adds, for playback. An API that rejects requests without one
+  will not work.
+- Firefox needs the host permission granted; the options page prompts for it.
+
 ## Player URLs
 
 The player takes what to play from its query string, so a page can be bookmarked, reloaded or
