@@ -81,6 +81,25 @@ inherits the global default shown in it, so a series that needs a particular `Re
 **Episodes → Edit** opens it in the player's side panel — and **Library** in the player header
 comes back to this page.
 
+### Sorting
+
+With more than one movie the header carries a sort control, remembered across sessions:
+
+| Order                      | Sorted by                                              |
+| -------------------------- | ------------------------------------------------------ |
+| Recently watched (default) | when it was last opened, or added if it never has been |
+| Recently added             | when the movie was added                               |
+| Recently updated           | when it was last edited, or added if it never has been |
+| Title                      | A–Z                                                    |
+
+A movie you have just added has never been watched, so **Recently watched** falls back to its add
+time rather than sinking it to the bottom — a new movie lands at the top and stays there until
+something is watched more recently.
+
+Only the display order changes — the library keeps its own order, so nothing is rewritten by
+sorting. Movies stored before a given timestamp existed sort as oldest, except that ties still read
+newest first.
+
 ### Adding a movie as JSON
 
 **Add movie** opens the form, and **Paste JSON instead** swaps it for a textarea. The shape is the

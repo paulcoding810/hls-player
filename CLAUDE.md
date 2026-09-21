@@ -19,7 +19,9 @@ storage is the fallback for a bare `player.html` and what the gallery's Continue
 reads; the player rewrites its own URL with `replaceState` when the episode changes. The toolbar
 icon (`openGallery()`) always lands on the gallery. The data model lives in `src/helper/library.js` — `parseMovieJson()` there reads that same
 shape back from pasted text for the form's JSON mode. A library holds
-movies, a movie holds episodes plus its own config, and blank config fields (`referer: ''`,
+movies, a movie holds episodes plus its own config, and it carries three timestamps the gallery's
+`sortMovies()` reads — `addedAt`, `updatedAt` (stamped by `updateMovie`) and `lastPlayedAt`
+(stamped by `setLastPlayed`); sorting never rewrites the stored order. Blank config fields (`referer: ''`,
 `skipLeading/skipTrailing: null`) inherit from the global settings via `resolveConfig`. Playback
 positions live in a separate store (`src/helper/progress.js`) keyed by episode URL. Both stores,
 plus the settings, round-trip through `src/helper/backup.js` — `readBackup` sanitizes an untrusted

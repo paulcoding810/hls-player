@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import ConfirmDialog from '@components/ConfirmDialog'
 import MovieForm from '@components/MovieForm'
 import { EditIcon, FilmIcon, PlayIcon, PlusIcon, SettingsIcon, TrashIcon } from '@components/icons'
-import { buttonClass, ghostButtonClass, iconButtonClass } from '@components/ui'
+import { buttonClass, ghostButtonClass, iconButtonClass, selectClass } from '@components/ui'
+import { SORT_ORDERS } from '@/helper/constants'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
 import {
   addMovie,
@@ -14,7 +15,7 @@ import {
   removeMovie,
   resumeEpisodeId,
   setEpisodes,
-  sortedByAdded,
+  sortMovies,
   updateMovie,
 } from '@/helper/library'
 import { openOptions, playerUrlForEpisode } from '@/helper/player'
@@ -174,7 +175,10 @@ export default function Gallery() {
     })()
   }, [])
 
-  const movies = useMemo(() => sortedByAdded(library.movies), [library.movies])
+  const movies = useMemo(
+    () => sortMovies(library.movies, settings.gallerySort, positions),
+    [library.movies, settings.gallerySort, positions],
+  )
 
   const lastMovie = findMovie(library, library.lastPlayed?.movieId)
   const lastEpisode =
@@ -222,6 +226,25 @@ export default function Gallery() {
           <PlusIcon />
           Add movie
         </button>
+        {library.movies.length > 1 && (
+          <select
+            value={settings.gallerySort}
+            onChange={(event) => {
+              const gallerySort = event.target.value
+              setSettings({ ...settings, gallerySort })
+              saveSettings({ gallerySort })
+            }}
+            aria-label="Sort movies"
+            title="Sort movies"
+            className={selectClass}
+          >
+            {SORT_ORDERS.map((order) => (
+              <option key={order.value} value={order.value}>
+                {order.label}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           type="button"
           onClick={() => openOptions()}

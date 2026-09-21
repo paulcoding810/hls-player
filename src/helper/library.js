@@ -125,7 +125,7 @@ export async function updateMovie(movieId, patch) {
   return saveLibrary({
     ...library,
     movies: library.movies.map((movie) =>
-      movie.id === movieId ? { ...movie, ...patch, id: movie.id } : movie,
+      movie.id === movieId ? { ...movie, ...patch, id: movie.id, updatedAt: Date.now() } : movie,
     ),
   })
 }
@@ -169,21 +169,56 @@ export async function setLastPlayed(movieId, episodeId) {
   const library = await getLibrary()
   return saveLibrary({
     movies: library.movies.map((movie) =>
-      movie.id === movieId ? { ...movie, lastEpisodeId: episodeId } : movie,
+      movie.id === movieId
+        ? { ...movie, lastEpisodeId: episodeId, lastPlayedAt: Date.now() }
+        : movie,
     ),
     lastPlayed: { movieId, episodeId },
   })
 }
 
 /**
- * Newest first. Movies stored before `addedAt` existed have no timestamp, so
- * they fall back to their position in the list, which was oldest-first.
+ * When a movie last came up. `lastPlayedAt` is only stamped from the point it
+ * was added, so a library from before then falls back to the freshest watch
+ * position it has — which `saveProgress` drops once an episode finishes, hence
+ * the pair rather than either alone. A movie that has never been played falls
+ * back to when it was added, so adding one puts it at the top rather than
+ * burying it under everything already watched.
  */
-export function sortedByAdded(movies) {
-  return movies
-    .map((movie, index) => ({ movie, index }))
-    .sort((a, b) => (b.movie.addedAt ?? 0) - (a.movie.addedAt ?? 0) || b.index - a.index)
-    .map((entry) => entry.movie)
+function watchedAt(movie, positions) {
+  if (movie.lastPlayedAt) return movie.lastPlayedAt
+  const fromProgress = movie.episodes.reduce(
+    (latest, episode) => Math.max(latest, positions[episode.src]?.updatedAt ?? 0),
+    0,
+  )
+  return fromProgress || movie.addedAt || 0
+}
+
+function sortKey(movie, order, positions) {
+  if (order === 'updated') return movie.updatedAt ?? movie.addedAt ?? 0
+  if (order === 'added') return movie.addedAt ?? 0
+  return watchedAt(movie, positions)
+}
+
+/**
+ * Sorted for display; the stored order is left alone. Every order but `title`
+ * is newest first, and ties fall back to the reverse of the stored order so
+ * movies saved before these timestamps existed still read newest first.
+ */
+export function sortMovies(movies, order = 'watched', positions = {}) {
+  const decorated = movies.map((movie, index) => ({ movie, index }))
+
+  if (order === 'title') {
+    decorated.sort((a, b) => a.movie.title.localeCompare(b.movie.title) || a.index - b.index)
+  } else {
+    decorated.sort(
+      (a, b) =>
+        sortKey(b.movie, order, positions) - sortKey(a.movie, order, positions) ||
+        b.index - a.index,
+    )
+  }
+
+  return decorated.map((entry) => entry.movie)
 }
 
 /** Where opening a movie should start: where it was left, else the beginning. */

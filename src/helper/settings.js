@@ -1,4 +1,5 @@
 import { settingsStorage } from '.'
+import { SORT_ORDERS } from './constants'
 
 export const DEFAULT_SETTINGS = {
   /** Sent as the `Referer` header for items that do not carry their own. */
@@ -9,6 +10,8 @@ export const DEFAULT_SETTINGS = {
   lastReferer: '',
   /** Take over navigations to a `.m3u8` or `.mpd` URL. */
   grabLinks: true,
+  /** How the library grid is arranged — one of `SORT_ORDERS`. */
+  gallerySort: 'watched',
   autoplay: true,
   muted: false,
   playbackRate: 1,
@@ -29,6 +32,9 @@ export function sanitizeSettings(settings) {
   return {
     ...settings,
     referer: (settings.referer ?? '').trim(),
+    gallerySort: SORT_ORDERS.some((order) => order.value === settings.gallerySort)
+      ? settings.gallerySort
+      : DEFAULT_SETTINGS.gallerySort,
     adPattern: (settings.adPattern ?? '').trim(),
     lastReferer: (settings.lastReferer ?? '').trim(),
     autoplay: Boolean(settings.autoplay),

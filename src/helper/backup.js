@@ -68,6 +68,8 @@ function sanitizeMovie(raw) {
     ...(lastEpisodeId ? { lastEpisodeId } : {}),
     episodes,
     addedAt: Number.isFinite(raw.addedAt) ? raw.addedAt : Date.now(),
+    ...(Number.isFinite(raw.updatedAt) ? { updatedAt: raw.updatedAt } : {}),
+    ...(Number.isFinite(raw.lastPlayedAt) ? { lastPlayedAt: raw.lastPlayedAt } : {}),
   }
 }
 
