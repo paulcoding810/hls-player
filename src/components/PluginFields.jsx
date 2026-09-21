@@ -11,10 +11,12 @@ import {
   linkButtonClass,
 } from './ui'
 import { EMPTY_PLUGIN, searchPlugin } from '@/helper/plugins'
+import { compilePattern } from '@/utils/playlist'
 
 const JSON_EXAMPLE = `{
   "name": "Example",
   "referer": "https://example.com/",
+  "adPattern": "^/ads/.+\\.ts$",
   "search": {
     "url": "https://api.example.com/search?q={query}",
     "list": "data.items",
@@ -69,6 +71,10 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
     }
     if (!draft.search.url.trim().includes('{query}')) {
       setError('The search URL needs a {query} placeholder.')
+      return
+    }
+    if (draft.adPattern.trim() && !compilePattern(draft.adPattern.trim())) {
+      setError('The ad segment pattern is not a valid regular expression.')
       return
     }
     onSave({ ...draft, name: draft.name.trim() })
@@ -175,6 +181,24 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
         <p className={helpClass}>
           Given to movies added from this source, for playback. It cannot be sent on the API calls
           below — <code>Referer</code> is a forbidden header for <code>fetch</code>.
+        </p>
+      </div>
+
+      <div>
+        <label className={labelClass} htmlFor="plugin-adpattern">
+          Ad segment pattern
+        </label>
+        <input
+          id="plugin-adpattern"
+          className={`${inputClass} font-mono text-xs`}
+          spellCheck="false"
+          placeholder="^/ads/.+\.ts$"
+          value={draft.adPattern}
+          onChange={(event) => setDraft({ ...draft, adPattern: event.target.value })}
+        />
+        <p className={helpClass}>
+          Also given to movies added from this source. Segments whose URI matches are cut from the
+          playlist — the pattern names the ads, not the content.
         </p>
       </div>
 

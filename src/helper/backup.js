@@ -116,6 +116,7 @@ function sanitizePlugin(raw) {
     name,
     enabled: raw.enabled !== false,
     referer: string(raw.referer),
+    adPattern: string(raw.adPattern).trim(),
     search: part('search', 'list'),
     details: part('details', 'episodes'),
   }

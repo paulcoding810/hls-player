@@ -11,8 +11,9 @@ import { normalizeSource } from '@/utils/url'
 export const EMPTY_PLUGIN = {
   name: '',
   enabled: true,
-  /** Inherited by movies added from this source, for playback. */
+  /** Both inherited by movies added from this source, for playback. */
   referer: '',
+  adPattern: '',
   search: { url: '', list: '', fields: { id: '', title: '', poster: '' } },
   details: { url: '', episodes: '', fields: { title: '', src: '' } },
 }

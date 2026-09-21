@@ -281,6 +281,7 @@ export default function Gallery() {
         title: result.title,
         poster: result.poster,
         referer: plugin.referer,
+        adPattern: plugin.adPattern,
         episodes,
         source: { pluginId: plugin.id, itemId: result.id },
       })

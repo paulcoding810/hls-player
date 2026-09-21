@@ -137,6 +137,7 @@ build below. Instead you say _where_ the values are:
 {
   "name": "Example",
   "referer": "https://example.com/",
+  "adPattern": "^/ads/.+\\.ts$",
   "search": {
     "url": "https://api.example.com/search?q={query}",
     "list": "data.items",
@@ -158,6 +159,13 @@ build below. Instead you say _where_ the values are:
   rather than half-built.
 - A field is treated as a template if it contains `{`, and as a path otherwise — so `src` can be
   either `url` (a path to a ready-made URL) or the template above.
+
+`referer` and `adPattern` describe the site rather than its API, so they are handed to every movie
+added from the source and take effect during playback — see
+[Server-side ad insertion](#server-side-ad-insertion) for what the pattern matches. They are copied
+at the moment a movie is added, not looked up later: changing them on the source updates what new
+movies inherit, and leaves movies already in the library alone, the same way editing a movie is
+never undone by a refresh.
 
 **Test** in the source form runs a real search for "test" and shows what it extracted. Getting the
 paths right against someone else's JSON is the fiddly part; this is how you do it without guessing.
