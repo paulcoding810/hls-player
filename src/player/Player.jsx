@@ -82,6 +82,9 @@ const SEGMENT_TYPES = new Set(['segment', 'segment-media-initialization'])
 /** Seconds of grace before an auto-skipped outro moves on, long enough to stop it. */
 const OUTRO_COUNTDOWN = 5
 
+/** How far short of the end `ended` may fire and still count as finished. */
+const ENDED_TOLERANCE = 5
+
 const IDLE_DELAY = 2500
 
 /** How often the playback position is written while watching. */
@@ -118,6 +121,14 @@ export default function Player() {
   const hasNextRef = useRef(false)
   /** Guards the automatic outro jump against repeat `timeupdate` calls. */
   const skippedRef = useRef(false)
+  /**
+   * The longest duration this source has reported. A stream cut short — a
+   * network error, an exclusion, a truncated playlist — ends its media source
+   * at whatever was buffered, which shrinks `duration()`. The outro window is
+   * measured back from the end, so a shrinking duration slides that window
+   * into the middle of the episode and fires it there.
+   */
+  const durationRef = useRef(0)
   const idleTimer = useRef(null)
   const srcRef = useRef(null)
   const savedAtRef = useRef(0)
@@ -273,7 +284,7 @@ export default function Player() {
 
       const { autoSkip, skipLeading, playbackRate } = configRef.current
       instance.playbackRate(playbackRate)
-      const duration = instance.duration()
+      const duration = longestDuration(instance, durationRef)
       if (
         autoSkip &&
         !holdRef.current &&
@@ -292,7 +303,7 @@ export default function Player() {
         saveProgress(srcRef.current, time, instance.duration())
       }
 
-      const window = skipAt(time, instance.duration(), configRef.current)
+      const window = skipAt(time, longestDuration(instance, durationRef), configRef.current)
       if (!configRef.current.autoSkip) {
         // Turning auto skip off mid-countdown hands the choice back over.
         setCountdown(null)
@@ -312,6 +323,14 @@ export default function Player() {
     })
 
     instance.on('ended', () => {
+      // A stream that fails mid-episode ends its media source too, so `ended`
+      // is not proof the episode finished. Advancing on it would drop the rest
+      // of the episode, and clearing progress would lose the place as well.
+      const expected = durationRef.current
+      if (expected > 0 && expected - instance.currentTime() > ENDED_TOLERANCE) {
+        setError('The stream ended early.')
+        return
+      }
       if (srcRef.current) clearProgress(srcRef.current)
       advanceRef.current()
     })
@@ -393,6 +412,7 @@ export default function Player() {
       srcRef.current = source.src
       savedAtRef.current = 0
       skippedRef.current = false
+      durationRef.current = 0
       holdRef.current = false
       setResume(null)
       setSkip(null)
@@ -887,6 +907,17 @@ export default function Player() {
 }
 
 /** Which skip the current position offers, if any. */
+/**
+ * `duration()`, but never shorter than this source has already reported. Live
+ * streams (`Infinity`) and an unknown duration pass straight through.
+ */
+function longestDuration(player, ref) {
+  const reported = player.duration()
+  if (!Number.isFinite(reported) || reported <= 0) return reported
+  if (reported > ref.current) ref.current = reported
+  return ref.current
+}
+
 function skipAt(time, duration, { skipLeading, skipTrailing }) {
   // Both need a real end: a live stream has none, and an intro longer than the
   // episode would seek past it.
