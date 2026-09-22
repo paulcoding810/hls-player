@@ -1,4 +1,5 @@
 import { libraryStorage } from '.'
+import { clearProgressFor } from './progress'
 import { compilePattern } from '@/utils/playlist'
 import { normalizeReferer, normalizeSource } from '@/utils/url'
 
@@ -15,6 +16,8 @@ export const EMPTY_MOVIE = {
   adPattern: '',
   /** `{ pluginId, itemId }` when a source plugin added it, else null. */
   source: null,
+  /** When it was marked finished; playing it again clears this. */
+  watchedAt: null,
   skipLeading: null,
   skipTrailing: null,
   autoSkip: null,
@@ -172,7 +175,7 @@ export async function setLastPlayed(movieId, episodeId) {
   return saveLibrary({
     movies: library.movies.map((movie) =>
       movie.id === movieId
-        ? { ...movie, lastEpisodeId: episodeId, lastPlayedAt: Date.now() }
+        ? { ...movie, lastEpisodeId: episodeId, lastPlayedAt: Date.now(), watchedAt: null }
         : movie,
     ),
     lastPlayed: { movieId, episodeId },
@@ -188,7 +191,9 @@ export async function setLastPlayed(movieId, episodeId) {
  * burying it under everything already watched.
  */
 function watchedAt(movie, positions) {
-  if (movie.lastPlayedAt) return movie.lastPlayedAt
+  // Marking it finished counts as watching it, so it sorts where you expect.
+  const stamped = Math.max(movie.lastPlayedAt ?? 0, movie.watchedAt ?? 0)
+  if (stamped) return stamped
   const fromProgress = movie.episodes.reduce(
     (latest, episode) => Math.max(latest, positions[episode.src]?.updatedAt ?? 0),
     0,
@@ -221,6 +226,33 @@ export function sortMovies(movies, order = 'watched', positions = {}) {
   }
 
   return decorated.map((entry) => entry.movie)
+}
+
+/**
+ * Records a movie as finished: the stored positions go, so does the episode it
+ * was left on, and Continue watching moves off it. Opening it again clears the
+ * mark — `setLastPlayed` does that. The positions are not recoverable by
+ * unmarking, which is the one destructive part of this.
+ */
+export async function markWatched(movieId, watched = true) {
+  const library = await getLibrary()
+  const movie = findMovie(library, movieId)
+  if (!movie) return library
+
+  if (watched) await clearProgressFor(movie.episodes.map((episode) => episode.src))
+
+  return saveLibrary({
+    movies: library.movies.map((item) =>
+      item.id === movieId
+        ? {
+            ...item,
+            watchedAt: watched ? Date.now() : null,
+            lastEpisodeId: watched ? null : item.lastEpisodeId,
+          }
+        : item,
+    ),
+    lastPlayed: watched && library.lastPlayed?.movieId === movieId ? null : library.lastPlayed,
+  })
 }
 
 /** Where opening a movie should start: where it was left, else the beginning. */

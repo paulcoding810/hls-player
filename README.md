@@ -81,6 +81,20 @@ inherits the global default shown in it, so a series that needs a particular `Re
 **Episodes → Edit** opens it in the player's side panel — and **Library** in the player header
 comes back to this page.
 
+### Marking a movie watched
+
+The tick on a card records it as finished: its stored positions go, the episode it was left on is
+forgotten, and **Continue watching** moves on. The card then reads _Watched_ and its button says
+**Play again**, which starts from the first episode. Under **Recently watched** it sorts as though
+you had just seen it.
+
+Clicking the tick again removes the mark, and opening the movie in the player removes it too —
+watching it again means it is no longer finished. What unmarking cannot do is bring the watch
+positions back: clearing them is the point of the action, and it is not undoable.
+
+Without this, a finished movie and one you never started are the same thing as far as the library
+is concerned — a position past the last 30 seconds is discarded rather than stored.
+
 ### Sorting
 
 With more than one movie the header carries a sort control, remembered across sessions:

@@ -4,6 +4,7 @@ import ConfirmDialog from '@components/ConfirmDialog'
 import MovieForm from '@components/MovieForm'
 import SearchResults from '@components/SearchResults'
 import {
+  CheckIcon,
   EditIcon,
   FilmIcon,
   PlayIcon,
@@ -30,6 +31,7 @@ import {
   findMovie,
   getLibrary,
   removeMovie,
+  markWatched,
   resumeEpisodeId,
   setEpisodes,
   sortMovies,
@@ -55,11 +57,21 @@ function ProgressBar({ percent, className = '' }) {
   )
 }
 
-function MovieCard({ movie, positions = {}, onPlay, onEdit, onDelete, onRefresh, refreshing }) {
+function MovieCard({
+  movie,
+  positions = {},
+  onPlay,
+  onEdit,
+  onDelete,
+  onRefresh,
+  onWatched,
+  refreshing,
+}) {
   const resumeId = resumeEpisodeId(movie)
   const resumeIndex = movie.episodes.findIndex((episode) => episode.id === resumeId)
   const resumeEpisode = movie.episodes[resumeIndex]
   const started = Boolean(movie.lastEpisodeId)
+  const watched = Boolean(movie.watchedAt)
   const percent = resumeEpisode ? percentOf(positions[resumeEpisode.src]) : null
 
   return (
@@ -91,8 +103,9 @@ function MovieCard({ movie, positions = {}, onPlay, onEdit, onDelete, onRefresh,
           {movie.title}
         </h3>
         <p className="text-ink-faint text-xs">
+          {watched && <span className="text-primary">Watched · </span>}
           {movie.episodes.length} episode{movie.episodes.length === 1 ? '' : 's'}
-          {resumeIndex > 0 && ` · at ${resumeEpisode.title}`}
+          {!watched && resumeIndex > 0 && ` · at ${resumeEpisode.title}`}
         </p>
 
         <div className="mt-2 flex items-center gap-2">
@@ -103,14 +116,23 @@ function MovieCard({ movie, positions = {}, onPlay, onEdit, onDelete, onRefresh,
             className={ghostButtonClass}
           >
             <PlayIcon className="h-3.5 w-3.5" />
-            {started ? 'Resume' : 'Play'}
+            {watched ? 'Play again' : started ? 'Resume' : 'Play'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onWatched(movie)}
+            className={`${iconButtonClass} ml-auto ${watched ? 'text-primary' : ''}`}
+            aria-label={watched ? `Mark ${movie.title} unwatched` : `Mark ${movie.title} watched`}
+            title={watched ? 'Mark as unwatched' : 'Mark as watched'}
+          >
+            <CheckIcon />
           </button>
           {movie.source && (
             <button
               type="button"
               onClick={() => onRefresh(movie)}
               disabled={refreshing}
-              className={`${iconButtonClass} ml-auto`}
+              className={iconButtonClass}
               aria-label={`Refresh ${movie.title}`}
               title="Check the source for new episodes"
             >
@@ -120,7 +142,7 @@ function MovieCard({ movie, positions = {}, onPlay, onEdit, onDelete, onRefresh,
           <button
             type="button"
             onClick={() => onEdit(movie.id)}
-            className={`${iconButtonClass} ${movie.source ? '' : 'ml-auto'}`}
+            className={iconButtonClass}
             aria-label={`Edit ${movie.title}`}
             title="Edit movie"
           >
@@ -293,6 +315,11 @@ export default function Gallery() {
     }
   }
 
+  const handleWatched = async (movie) => {
+    setLibrary(await markWatched(movie.id, !movie.watchedAt))
+    setPositions(await getAllProgress())
+  }
+
   const handleRefresh = async (movie) => {
     setAdding(movie.id)
     setNotice('')
@@ -436,6 +463,7 @@ export default function Gallery() {
                   onEdit={setEditing}
                   onDelete={setDeleting}
                   onRefresh={handleRefresh}
+                  onWatched={handleWatched}
                   refreshing={adding === movie.id}
                 />
               ))}

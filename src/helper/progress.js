@@ -59,6 +59,15 @@ export async function saveProgress(src, position, duration) {
   await writeAll(all)
 }
 
+/** Drops many positions in one write, for marking a whole movie watched. */
+export async function clearProgressFor(srcs) {
+  const all = await readAll()
+  const gone = srcs.filter((src) => src in all)
+  if (!gone.length) return
+  gone.forEach((src) => delete all[src])
+  await writeAll(all)
+}
+
 export async function clearProgress(src) {
   const all = await readAll()
   if (!(src in all)) return

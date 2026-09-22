@@ -66,6 +66,7 @@ function sanitizeMovie(raw) {
     referer: string(raw.referer),
     adPattern: string(raw.adPattern),
     source: sanitizeSource(raw.source),
+    watchedAt: Number.isFinite(raw.watchedAt) ? raw.watchedAt : null,
     skipLeading: numberOrNull(raw.skipLeading),
     skipTrailing: numberOrNull(raw.skipTrailing),
     autoSkip: typeof raw.autoSkip === 'boolean' ? raw.autoSkip : null,
