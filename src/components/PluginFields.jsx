@@ -18,7 +18,7 @@ const JSON_EXAMPLE = `{
   "referer": "https://example.com/",
   "adPattern": "^/ads/.+\\.ts$",
   "search": {
-    "url": "https://api.example.com/search?q={query}",
+    "url": "https://api.example.com/search?q={query}&page={page}",
     "list": "data.items",
     "fields": { "id": "vod_id", "title": "vod_name", "poster": "vod_pic" }
   },
@@ -209,8 +209,8 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
         <Field
           id="plugin-search-url"
           label="URL"
-          placeholder="https://api.example.com/search?q={query}"
-          help="{query} is replaced with what was typed, percent-encoded."
+          placeholder="https://api.example.com/search?q={query}&page={page}"
+          help="{query} is what was typed, percent-encoded. {page} counts from 1, for the More button."
           value={draft.search.url}
           onChange={(url) => section('search', { url })}
         />

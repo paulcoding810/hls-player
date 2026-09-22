@@ -107,8 +107,9 @@ function extract(entry, fields) {
   )
 }
 
-export async function searchPlugin(plugin, query) {
-  const url = fillTemplate(plugin.search?.url, { query })
+/** `page` is 1-based; a URL without `{page}` simply ignores it. */
+export async function searchPlugin(plugin, query, page = 1) {
+  const url = fillTemplate(plugin.search?.url, { query, page })
   const payload = await fetchJson(url, plugin.name || 'The source')
 
   return (
@@ -142,12 +143,30 @@ export async function searchAll(plugins, query) {
   return Promise.all(
     enabled.map(async (plugin) => {
       try {
-        return { plugin, results: await searchPlugin(plugin, query), error: '' }
+        const results = await searchPlugin(plugin, query)
+        // Nothing on page one means there is nothing to page through either.
+        return { plugin, results, error: '', page: 1, done: results.length === 0 }
       } catch (error) {
-        return { plugin, results: [], error: error.message }
+        return { plugin, results: [], error: error.message, page: 1, done: true }
       }
     }),
   )
+}
+
+/**
+ * The next page for one group, folded into the results it already has.
+ * Duplicates are dropped by id, which is also what catches a search URL with no
+ * `{page}` in it: the same page comes back, nothing is new, and paging stops
+ * rather than offering More for ever.
+ */
+export async function loadMore(group, query) {
+  const page = group.page + 1
+  const seen = new Set(group.results.map((result) => result.id))
+  const fresh = (await searchPlugin(group.plugin, query, page)).filter(
+    (result) => !seen.has(result.id),
+  )
+
+  return { ...group, results: [...group.results, ...fresh], page, done: fresh.length === 0 }
 }
 
 /**

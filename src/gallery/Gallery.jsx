@@ -39,7 +39,7 @@ import {
 } from '@/helper/library'
 import { openOptions, playerUrlForEpisode } from '@/helper/player'
 import { addMovie as addLibraryMovie } from '@/helper/library'
-import { fetchEpisodes, getPlugins, refreshMovie, searchAll } from '@/helper/plugins'
+import { fetchEpisodes, getPlugins, loadMore, refreshMovie, searchAll } from '@/helper/plugins'
 import { getAllProgress } from '@/helper/progress'
 import { formatTime } from '@/utils/time'
 
@@ -225,6 +225,8 @@ export default function Gallery() {
   const [searching, setSearching] = useState(false)
   /** `pluginId:itemId` of the result being added, and a page-level error. */
   const [adding, setAdding] = useState('')
+  /** Plugin id whose next page is in flight. */
+  const [loadingMore, setLoadingMore] = useState('')
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
@@ -288,6 +290,27 @@ export default function Gallery() {
       setGroups(await searchAll(plugins, term))
     } finally {
       setSearching(false)
+    }
+  }
+
+  const showMore = async (group) => {
+    setLoadingMore(group.plugin.id)
+    setNotice('')
+    try {
+      const next = await loadMore(group, query.trim())
+      setGroups((current) =>
+        current.map((item) => (item.plugin.id === group.plugin.id ? next : item)),
+      )
+    } catch (error) {
+      setNotice(error.message)
+      // A page that failed should not leave More offering itself for ever.
+      setGroups((current) =>
+        current.map((item) =>
+          item.plugin.id === group.plugin.id ? { ...item, done: true } : item,
+        ),
+      )
+    } finally {
+      setLoadingMore('')
     }
   }
 
@@ -431,6 +454,8 @@ export default function Gallery() {
           adding={adding}
           onAdd={addResult}
           onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
+          onMore={showMore}
+          loadingMore={loadingMore}
         />
       ) : (
         <>
@@ -453,7 +478,7 @@ export default function Gallery() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] content-start gap-4">
+            <div className="grid grid-cols-2 content-start gap-4 sm:grid-cols-3 md:grid-cols-4">
               {movies.map((movie) => (
                 <MovieCard
                   key={movie.id}

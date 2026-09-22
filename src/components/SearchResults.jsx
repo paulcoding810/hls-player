@@ -6,7 +6,16 @@ import { dangerBannerClass, ghostButtonClass } from './ui'
  * from. A source that failed keeps its group and shows why, so a broken one is
  * visible rather than silently missing.
  */
-export default function SearchResults({ groups, busy, added, adding, onAdd, onWatch }) {
+export default function SearchResults({
+  groups,
+  busy,
+  added,
+  adding,
+  onAdd,
+  onWatch,
+  onMore,
+  loadingMore,
+}) {
   const total = groups.reduce((count, group) => count + group.results.length, 0)
 
   if (busy) return <p className="text-ink-faint text-sm">Searching…</p>
@@ -72,6 +81,17 @@ export default function SearchResults({ groups, busy, added, adding, onAdd, onWa
               </article>
             )
           })}
+
+          {!group.error && !group.done && (
+            <button
+              type="button"
+              onClick={() => onMore(group)}
+              disabled={loadingMore === group.plugin.id}
+              className={`${ghostButtonClass} self-start`}
+            >
+              {loadingMore === group.plugin.id ? 'Loading…' : 'More'}
+            </button>
+          )}
         </section>
       ))}
     </div>

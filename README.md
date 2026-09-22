@@ -153,7 +153,7 @@ build below. Instead you say _where_ the values are:
   "referer": "https://example.com/",
   "adPattern": "^/ads/.+\\.ts$",
   "search": {
-    "url": "https://api.example.com/search?q={query}",
+    "url": "https://api.example.com/search?q={query}&page={page}",
     "list": "data.items",
     "fields": { "id": "vod_id", "title": "vod_name", "poster": "vod_pic" }
   },
@@ -167,6 +167,8 @@ build below. Instead you say _where_ the values are:
 
 - **Paths** are dots and `[0]` indices — `data.play[0].list`. A path that matches nothing yields
   nothing rather than an error, so a wrong one shows up as an empty result, not a crash.
+- **`{page}`** in the search URL counts from 1 and drives the **More** button under each group
+  of results. It is optional: leave it out and you get one page.
 - **Templates** substitute `{name}` from the entry being read. `{query}` is percent-encoded
   because it is free text you typed; every other placeholder goes in raw, since those are path
   fragments the API returned. A field whose template still has an unfilled placeholder is dropped
@@ -186,7 +188,12 @@ paths right against someone else's JSON is the fiddly part; this is how you do i
 
 Searching queries every enabled source at once and groups the results. A source that fails shows
 its error in its own group instead of taking the search down. A result already in the library
-reads **Added**.
+offers **Watch** instead of **Add**.
+
+**More** under a group fetches that source's next page and appends it — each source pages
+independently, since one may have more to give than another. Results already shown are not
+repeated, which is also what stops a search URL with no `{page}` in it: the same page comes back,
+nothing is new, and the button retires instead of offering itself for ever.
 
 ### Refreshing
 
