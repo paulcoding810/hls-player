@@ -237,16 +237,21 @@ seek bar), a seek bar with the buffered range behind the played one, volume, spe
 menu and fullscreen. It fades out 2.5s after the pointer goes idle during playback and comes back
 on the first move.
 
-| Key           | Action                  |
-| ------------- | ----------------------- |
-| `space` / `k` | play or pause           |
-| `←` / `→`     | seek 5s                 |
-| `↑` / `↓`     | volume                  |
-| `m`           | mute                    |
-| `f`           | fullscreen              |
-| `p` / `n`     | previous / next episode |
+| Key           | Action                                    |
+| ------------- | ----------------------------------------- |
+| `space` / `k` | play or pause                             |
+| `←` / `→`     | seek 5s                                   |
+| `↑` / `↓`     | volume                                    |
+| `m`           | mute                                      |
+| `f`           | fullscreen                                |
+| `p` / `n`     | previous / next episode                   |
+| `esc`         | close the panel, else back to the library |
 
 Clicking the video toggles playback, double-clicking toggles fullscreen.
+
+`esc` unwinds one layer at a time: it closes the episodes panel if that is open, otherwise it
+stores the position and returns to the library. In fullscreen it is left to the browser, which is
+already using it to leave fullscreen, and while the resume prompt is up it belongs to the dialog.
 
 ## Resume
 

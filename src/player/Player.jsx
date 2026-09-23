@@ -642,9 +642,19 @@ export default function Player() {
         f: toggleFullscreen,
         n: () => hasNext && goToEpisode(movie.episodes[episodeIndex + 1].id),
         p: () => hasPrevious && goToEpisode(movie.episodes[episodeIndex - 1].id),
+        // Escape unwinds one layer at a time: the panel first, then the page.
+        // Fullscreen is the browser's to leave, so it is left to it.
+        Escape: () => {
+          if (panel) setPanel(null)
+          else goToLibrary()
+        },
       }
 
       const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
+      // Escape while fullscreen belongs to the browser: taking it here would
+      // leave the page behind the fullscreen view it was about to exit.
+      if (key === 'Escape' && document.fullscreenElement) return
+
       const handler = handlers[key]
       if (!handler) return
       event.preventDefault()
@@ -666,6 +676,7 @@ export default function Player() {
     resume,
     panel,
     episode,
+    goToLibrary,
   ])
 
   const handleLevelChange = (event) => {
