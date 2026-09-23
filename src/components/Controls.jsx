@@ -249,7 +249,7 @@ export default function Controls({
             value={state.rate}
             onChange={(event) => onRateChange(Number(event.target.value))}
             aria-label="Speed"
-            title="Playback speed"
+            title="Playback speed (, and .)"
             className={selectClass}
           >
             {PLAYBACK_RATES.map((rate) => (

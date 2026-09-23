@@ -25,7 +25,7 @@ import {
   overlayPlayButtonClass,
   warnBannerClass,
 } from '@components/ui'
-import { GALLERY_PATH, MESSAGE } from '@/helper/constants'
+import { GALLERY_PATH, MESSAGE, PLAYBACK_RATES } from '@/helper/constants'
 import {
   addMovie,
   EMPTY_LIBRARY,
@@ -581,6 +581,32 @@ export default function Player() {
     })
   }, [])
 
+  /** The rate is remembered globally, so it outlives this episode. */
+  const setRate = useCallback(
+    (playbackRate) => {
+      playerRef.current?.playbackRate(playbackRate)
+      updateSettings({ playbackRate })
+    },
+    [updateSettings],
+  )
+
+  /** Steps along `PLAYBACK_RATES` rather than by a fixed amount, so the keys
+   *  and the menu can never disagree about which speeds exist. */
+  const stepRate = useCallback(
+    (delta) => {
+      const current = playerRef.current?.playbackRate() ?? 1
+      // A rate set elsewhere may not be in the list; start from the nearest.
+      const from = PLAYBACK_RATES.reduce(
+        (best, rate, index) =>
+          Math.abs(rate - current) < Math.abs(PLAYBACK_RATES[best] - current) ? index : best,
+        0,
+      )
+      const next = PLAYBACK_RATES[Math.min(PLAYBACK_RATES.length - 1, Math.max(0, from + delta))]
+      if (next !== current) setRate(next)
+    },
+    [setRate],
+  )
+
   /**
    * Saving does not re-point playback at the new entry: the URL is already what
    * is playing and progress is written against it, so switching would only
@@ -640,6 +666,10 @@ export default function Player() {
         ArrowDown: () => setVolume(-0.05),
         m: () => instance.muted(!instance.muted()),
         f: toggleFullscreen,
+        '<': () => stepRate(-1),
+        '>': () => stepRate(1),
+        ',': () => stepRate(-1),
+        '.': () => stepRate(1),
         n: () => hasNext && goToEpisode(movie.episodes[episodeIndex + 1].id),
         p: () => hasPrevious && goToEpisode(movie.episodes[episodeIndex - 1].id),
         // Escape unwinds one layer at a time: the panel first, then the page.
@@ -677,6 +707,7 @@ export default function Player() {
     panel,
     episode,
     goToLibrary,
+    stepRate,
   ])
 
   const handleLevelChange = (event) => {
@@ -828,10 +859,7 @@ export default function Player() {
                   levels={levels}
                   level={level}
                   onLevelChange={handleLevelChange}
-                  onRateChange={(playbackRate) => {
-                    playerRef.current?.playbackRate(playbackRate)
-                    updateSettings({ playbackRate })
-                  }}
+                  onRateChange={setRate}
                   onPrevious={() => goToEpisode(movie.episodes[episodeIndex - 1].id)}
                   onNext={() => goToEpisode(movie.episodes[episodeIndex + 1].id)}
                   hasPrevious={hasPrevious}

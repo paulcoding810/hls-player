@@ -243,11 +243,16 @@ on the first move.
 | `←` / `→`     | seek 5s                                   |
 | `↑` / `↓`     | volume                                    |
 | `m`           | mute                                      |
+| `,` / `.`     | slower / faster                           |
 | `f`           | fullscreen                                |
 | `p` / `n`     | previous / next episode                   |
 | `esc`         | close the panel, else back to the library |
 
 Clicking the video toggles playback, double-clicking toggles fullscreen.
+
+Speed steps through the same list the menu offers — 0.5× to 2× — rather than by a fixed amount,
+so the keys and the menu can never disagree about which speeds exist. `<` and `>` work too, being
+the same keys with shift. The chosen speed is remembered globally and carries to the next episode.
 
 `esc` unwinds one layer at a time: it closes the episodes panel if that is open, otherwise it
 stores the position and returns to the library. In fullscreen it is left to the browser, which is
