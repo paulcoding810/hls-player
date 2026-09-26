@@ -36,11 +36,23 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm exec prettier --check '**/*.{jsx,js,tsx,ts,json,css,scss,md}'
+
+      - name: Unit tests
+        run: pnpm test
+
       - name: Create chrome artifacts
         run: pnpm zip
 
       - name: Create Firefox artifacts
         run: pnpm zip:firefox
+
+      - name: Check the built extensions
+        run: pnpm test
 
       - uses: actions/upload-artifact@v4
         with:

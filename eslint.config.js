@@ -36,6 +36,11 @@ export default [
     },
   },
   {
+    // Tests run in Node, not the browser, and stub globals as they need them.
+    files: ['test/**'],
+    languageOptions: { globals: { ...globals.node } },
+  },
+  {
     ignores: ['build', 'packages'],
   },
 ]

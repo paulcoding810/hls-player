@@ -36,11 +36,18 @@ plus the settings, round-trip through `src/helper/backup.js` — `readBackup` sa
 file and `applyBackup` merges it by movie id, behind the Data section of the options page.
 
 ```shell
+pnpm test             # node --test; add to test/, stubs in test/helpers.mjs
+pnpm lint
 pnpm build            # -> build/chrome
 pnpm build:firefox    # -> build/firefox
-pnpm exec eslint src
 pnpm fmt
 ```
+
+Anything pure belongs in `test/`. Two guards there are load-bearing and must not be deleted as
+"build artefacts": `new Worker(` must never appear in a bundle (a `blob:` worker breaks Firefox
+alone), and the Firefox manifest must carry blocking `webRequest` rather than `declarativeNetRequest`.
+`sanitizeMovie` in `backup.js` names every field explicitly, so `test/backup.test.js` walks
+`EMPTY_MOVIE` and fails when a newly added one is forgotten — that has been missed once per field.
 
 # Design rules
 

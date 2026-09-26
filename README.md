@@ -497,6 +497,26 @@ cd hls-player
 pnpm dev
 ```
 
+### Tests
+
+```shell
+pnpm test          # node --test, no test framework to install
+pnpm test:watch
+pnpm lint
+```
+
+The suites in `test/` cover the pure parts — playlist rewriting, plugin
+extraction, the library rules, the JSON and backup shapes — with
+`chrome.storage` and `fetch` stubbed in `test/helpers.mjs`. `test/register.mjs`
+teaches Node the `@/` alias and extensionless imports that Vite resolves at
+build time.
+
+`test/build.test.js` checks the built output instead of the source: that the
+Firefox manifest really did swap `declarativeNetRequest` for blocking
+`webRequest`, and that no `new Worker(` reached the bundle — a blob worker
+breaks playback on Firefox only, so nothing else would catch it. Those skip
+when there is no build, and CI runs the suite a second time after building.
+
 ### Chrome Extension Developer Mode
 
 1. set your Chrome browser 'Developer mode' up
