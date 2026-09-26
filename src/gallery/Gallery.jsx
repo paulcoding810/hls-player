@@ -255,6 +255,14 @@ export default function Gallery() {
     [library.movies, settings.gallerySort, positions],
   )
 
+  const term = query.trim().toLowerCase()
+  /** Typing filters what is already here; only Enter asks the sources. */
+  const shown = useMemo(
+    () => (term ? movies.filter((movie) => movie.title.toLowerCase().includes(term)) : movies),
+    [movies, term],
+  )
+  const sources = plugins.some((plugin) => plugin.enabled)
+
   const lastMovie = findMovie(library, library.lastPlayed?.movieId)
   const lastEpisode =
     findEpisode(lastMovie, library.lastPlayed?.episodeId) ??
@@ -457,7 +465,7 @@ export default function Gallery() {
         </button>
       </header>
 
-      {plugins.some((plugin) => plugin.enabled) && (
+      {(library.movies.length > 0 || sources) && (
         <form onSubmit={runSearch} className="mb-6 flex items-center gap-2">
           <div className="relative flex-1">
             <input
@@ -465,11 +473,15 @@ export default function Gallery() {
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value)
-                // Emptying the box puts the library back.
-                if (!event.target.value.trim()) setGroups(null)
+                // Typing goes back to filtering the library; Enter searches again.
+                setGroups(null)
               }}
-              placeholder="Search your sources…"
-              aria-label="Search sources"
+              placeholder={
+                sources
+                  ? 'Filter the library, or press Enter to search sources…'
+                  : 'Filter the library…'
+              }
+              aria-label="Filter the library, or search sources"
               className={`${inputClass} pr-9`}
             />
             {query && (
@@ -488,7 +500,12 @@ export default function Gallery() {
               </button>
             )}
           </div>
-          <button type="submit" disabled={!query.trim()} className={ghostButtonClass}>
+          <button
+            type="submit"
+            disabled={!query.trim() || !sources}
+            title={sources ? 'Search your sources' : 'Add a source on the options page first'}
+            className={ghostButtonClass}
+          >
             <SearchIcon className="h-3.5 w-3.5" />
             Search
           </button>
@@ -518,7 +535,7 @@ export default function Gallery() {
         />
       ) : (
         <>
-          {lastMovie && lastEpisode && (
+          {!term && lastMovie && lastEpisode && (
             <ContinueWatching
               movie={lastMovie}
               episode={lastEpisode}
@@ -536,9 +553,20 @@ export default function Gallery() {
                 Add your first movie
               </button>
             </div>
+          ) : shown.length === 0 ? (
+            <div className="text-ink-faint flex flex-1 flex-col items-center justify-center gap-3">
+              <FilmIcon className="h-10 w-10" />
+              <p className="text-sm">Nothing in the library matches “{query.trim()}”.</p>
+              {sources && (
+                <button type="button" onClick={runSearch} className={ghostButtonClass}>
+                  <SearchIcon className="h-3.5 w-3.5" />
+                  Search your sources for it
+                </button>
+              )}
+            </div>
           ) : (
             <div className="grid grid-cols-2 content-start gap-4 sm:grid-cols-3 md:grid-cols-4">
-              {movies.map((movie) => (
+              {shown.map((movie) => (
                 <MovieCard
                   key={movie.id}
                   movie={movie}

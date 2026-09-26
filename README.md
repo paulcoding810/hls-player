@@ -186,6 +186,14 @@ never undone by a refresh.
 **Test** in the source form runs a real search for "test" and shows what it extracted. Getting the
 paths right against someone else's JSON is the fiddly part; this is how you do it without guessing.
 
+The box above the grid does two things. **Typing filters the library you already have** — matching
+movie titles, as you type, with no network involved. **Enter searches your sources**, replacing the
+grid with grouped results. Typing again drops back to filtering, and the clear button returns to
+the full library.
+
+The box is there whenever you have movies, even with no sources configured; the **Search** button
+is what needs one.
+
 Searching queries every enabled source at once and groups the results. A source that fails shows
 its error in its own group instead of taking the search down. A result already in the library
 offers **Watch** instead of **Add**.
