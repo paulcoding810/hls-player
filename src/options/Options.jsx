@@ -5,6 +5,7 @@ import PluginForm from '@components/PluginForm'
 import SettingsPanel from '@components/SettingsPanel'
 import {
   AlertIcon,
+  CopyIcon,
   DownloadIcon,
   EditIcon,
   LibraryIcon,
@@ -22,7 +23,7 @@ import {
 } from '@components/ui'
 import { applyBackup, backupFileName, buildBackup, readBackup } from '@/helper/backup'
 import { clearLibrary, getLibrary } from '@/helper/library'
-import { addPlugin, getPlugins, removePlugin, updatePlugin } from '@/helper/plugins'
+import { addPlugin, getPlugins, pluginToJson, removePlugin, updatePlugin } from '@/helper/plugins'
 import { openGallery } from '@/helper/player'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
 import api from '@/utils/api'
@@ -127,6 +128,16 @@ export const Options = () => {
     setPlugins(await getPlugins())
   }
 
+  const copyPlugin = async (plugin) => {
+    setNotice(null)
+    try {
+      await navigator.clipboard.writeText(pluginToJson(plugin))
+      setNotice({ tone: 'warn', message: `Copied “${plugin.name}” as JSON.` })
+    } catch (error) {
+      setNotice({ tone: 'danger', message: `Could not copy: ${error.message}` })
+    }
+  }
+
   const deletePlugin = async (plugin) => {
     await removePlugin(plugin.id)
     setPlugins(await getPlugins())
@@ -193,6 +204,15 @@ export const Options = () => {
                 <span className="min-w-0 flex-1 truncate text-sm" title={plugin.search.url}>
                   {plugin.name}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => copyPlugin(plugin)}
+                  className={iconButtonClass}
+                  aria-label={`Copy ${plugin.name} as JSON`}
+                  title="Copy as JSON"
+                >
+                  <CopyIcon />
+                </button>
                 <button
                   type="button"
                   onClick={() => setEditing(plugin.id)}

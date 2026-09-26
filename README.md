@@ -183,6 +183,11 @@ at the moment a movie is added, not looked up later: changing them on the source
 movies inherit, and leaves movies already in the library alone, the same way editing a movie is
 never undone by a refresh.
 
+Each source in the list has a **copy** button that puts it on the clipboard in exactly the shape
+**Paste JSON instead** reads back, so a working source can be handed to someone else. Its local id
+is left out — the receiving install issues its own — and a source that is switched off says so,
+rather than arriving quietly enabled.
+
 **Test** in the source form runs a real search for "test" and shows what it extracted. Getting the
 paths right against someone else's JSON is the fiddly part; this is how you do it without guessing.
 

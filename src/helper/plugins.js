@@ -51,6 +51,27 @@ export async function removePlugin(pluginId) {
   return savePlugins((await getPlugins()).filter((plugin) => plugin.id !== pluginId))
 }
 
+/**
+ * A source as the text its JSON mode reads back, for sharing one. `id` is left
+ * out because it is local to this install, and a blank optional field is
+ * omitted rather than written empty — absent means "not set" on the way back.
+ */
+export function pluginToJson(plugin) {
+  return JSON.stringify(
+    {
+      name: plugin.name,
+      referer: plugin.referer || undefined,
+      adPattern: plugin.adPattern || undefined,
+      // Only worth stating when it is not the default.
+      enabled: plugin.enabled === false ? false : undefined,
+      search: plugin.search,
+      details: plugin.details,
+    },
+    null,
+    2,
+  )
+}
+
 function text(value) {
   return typeof value === 'string' || typeof value === 'number' ? String(value).trim() : ''
 }
