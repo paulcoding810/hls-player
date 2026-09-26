@@ -25,7 +25,11 @@ const JSON_EXAMPLE = `{
   "details": {
     "url": "https://api.example.com/detail/{id}",
     "episodes": "data.play[0].list",
-    "fields": { "title": "name", "src": "https://cdn.example.com/{path}.m3u8" }
+    "fields": {
+      "title": "name",
+      "src": "https://cdn.example.com/{path}.m3u8",
+      "subtitles": "subs"
+    }
   }
 }`
 
@@ -266,7 +270,7 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
           value={draft.details.episodes}
           onChange={(episodes) => section('details', { episodes })}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Field
             id="plugin-details-title"
             label="Episode title"
@@ -278,9 +282,17 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
             id="plugin-details-src"
             label="Episode URL"
             placeholder="url"
-            help="A path, or a template like https://cdn.example.com/{path}.m3u8"
+            help="A path, or a template using {…} fields."
             value={draft.details.fields.src}
             onChange={(src) => fields('details', { src })}
+          />
+          <Field
+            id="plugin-details-subtitles"
+            label="Subtitles"
+            placeholder="subs"
+            help="Optional. One URL, or a list of them."
+            value={draft.details.fields.subtitles ?? ''}
+            onChange={(subtitles) => fields('details', { subtitles })}
           />
         </div>
       </fieldset>

@@ -1,3 +1,5 @@
+import { readSubtitles } from './subtitles'
+
 /** Returns a normalized http(s) URL, or `null` when the input is unusable. */
 export function normalizeSource(input) {
   const value = (input || '').trim()
@@ -25,6 +27,10 @@ export function normalizeReferer(input) {
 /**
  * One episode per line, either a bare URL or `Title | https://…`. Titles may
  * contain anything, so the last `|` is the separator.
+ *
+ * After it come one or more URLs separated by whitespace: the video first, any
+ * subtitle files after it. A URL cannot hold an unencoded space, so this stays
+ * unambiguous, and a line carrying a single URL reads exactly as it always did.
  */
 export function parseEpisodeLines(text) {
   const lines = (text || '').split(/\r?\n/)
@@ -38,15 +44,27 @@ export function parseEpisodeLines(text) {
 
     const separator = trimmed.lastIndexOf('|')
     const title = separator > -1 ? trimmed.slice(0, separator).trim() : ''
-    const src = normalizeSource(separator > -1 ? trimmed.slice(separator + 1) : trimmed)
+    const [first, ...rest] = (separator > -1 ? trimmed.slice(separator + 1) : trimmed)
+      .split(/\s+/)
+      .filter(Boolean)
 
+    const src = normalizeSource(first)
     if (!src) {
       skipped += 1
       return
     }
+
+    // A mistyped subtitle URL is reported rather than quietly dropped — losing
+    // one without saying so is how a line silently loses half its meaning.
+    const subtitles = readSubtitles(rest, normalizeSource)
+    if (subtitles.length !== rest.length) {
+      skipped += 1
+      return
+    }
+
     if (seen.has(src)) return
     seen.add(src)
-    episodes.push({ title, src })
+    episodes.push({ title, src, ...(subtitles.length ? { subtitles } : {}) })
   })
 
   return { episodes, skipped }

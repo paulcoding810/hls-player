@@ -43,9 +43,16 @@ export default function MovieFields({
     ...(movie ?? {}),
   })
   // Editing starts from the saved episodes, so they can be renamed, fixed or
-  // reordered as text; `parseEpisodeLines` splits on the last `|` to read it back.
+  // reordered as text; `parseEpisodeLines` splits on the last `|` to read it back,
+  // then on whitespace, so any subtitle files follow the video URL on the line.
   const [episodesText, setEpisodesText] = useState(
-    (movie?.episodes ?? []).map((episode) => `${episode.title} | ${episode.src}`).join('\n'),
+    (movie?.episodes ?? [])
+      .map((episode) =>
+        [`${episode.title} | ${episode.src}`, ...(episode.subtitles ?? []).map((s) => s.src)].join(
+          ' ',
+        ),
+      )
+      .join('\n'),
   )
   const [error, setError] = useState('')
   // Pasting is an alternative to filling the form, so it is offered only when
@@ -216,14 +223,19 @@ export default function MovieFields({
           rows={movie ? 8 : 4}
           spellCheck="false"
           className={`${inputClass} resize-y font-mono text-xs`}
-          placeholder={'https://example.com/ep1.m3u8\nEpisode 2 | https://example.com/ep2.mpd'}
+          placeholder={
+            'https://example.com/ep1.m3u8\n' +
+            'Episode 2 | https://example.com/ep2.mpd https://example.com/ep2.en.vtt'
+          }
           value={episodesText}
           onChange={(event) => setEpisodesText(event.target.value)}
         />
         <p className={helpClass}>
           HLS (<code>.m3u8</code>) or DASH (<code>.mpd</code>), one per line, optionally{' '}
           <code>Title | URL</code>. Untitled episodes are numbered; removing a line removes the
-          episode.
+          episode. Subtitle files (<code>.vtt</code> or <code>.srt</code>) follow the video URL on
+          the same line, separated by spaces — use <strong>Paste JSON instead</strong> to name or
+          label them.
         </p>
       </div>
 

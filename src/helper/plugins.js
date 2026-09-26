@@ -1,6 +1,7 @@
 import { pluginStorage } from '.'
 import { setEpisodes } from './library'
 import { fillTemplate, readPath } from '@/utils/jsonPath'
+import { readSubtitles } from '@/utils/subtitles'
 import { normalizeSource } from '@/utils/url'
 
 /**
@@ -15,7 +16,7 @@ export const EMPTY_PLUGIN = {
   referer: '',
   adPattern: '',
   search: { url: '', list: '', fields: { id: '', title: '', poster: '' } },
-  details: { url: '', episodes: '', fields: { title: '', src: '' } },
+  details: { url: '', episodes: '', fields: { title: '', src: '', subtitles: '' } },
 }
 
 /** A dead host must not hang the search. */
@@ -149,7 +150,17 @@ export async function fetchEpisodes(plugin, item) {
   return listAt(payload, plugin.details?.episodes)
     .map((entry) => {
       const fields = extract(entry, plugin.details?.fields)
-      return { title: fields.title, src: normalizeSource(fields.src) }
+      // The subtitles path may name one URL or a list, so the raw value is
+      // read rather than the flattened text `extract` produces.
+      const subtitles = readSubtitles(
+        readPath(entry, plugin.details?.fields?.subtitles) ?? fields.subtitles,
+        normalizeSource,
+      )
+      return {
+        title: fields.title,
+        src: normalizeSource(fields.src),
+        ...(subtitles.length ? { subtitles } : {}),
+      }
     })
     .filter((episode) => episode.src)
 }

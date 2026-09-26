@@ -12,7 +12,9 @@ export const selectClass =
 export const labelClass =
   'mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-muted'
 
-export const helpClass = 'mt-1 text-xs text-ink-faint'
+// `break-words`: help text quotes URLs and patterns, which hold no spaces to
+// wrap at and would otherwise run out of their column into the next one.
+export const helpClass = 'mt-1 text-xs break-words text-ink-faint'
 
 /** Solid red — at most one per view. */
 export const buttonClass =

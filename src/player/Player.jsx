@@ -45,6 +45,7 @@ import api from '@/utils/api'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
 import { compilePattern, stripAdSegments } from '@/utils/playlist'
 import { stripDecoyPrefix } from '@/utils/segments'
+import { toVtt } from '@/utils/subtitles'
 import { fileNameOf, manifestMime, normalizeSource } from '@/utils/url'
 import './Player.css'
 
@@ -116,6 +117,8 @@ export default function Player() {
   const playerRef = useRef(null)
   /** Movie config merged over the global settings, for the video callbacks. */
   const configRef = useRef(resolveConfig(null, DEFAULT_SETTINGS))
+  /** Blob URLs behind the loaded subtitle tracks, revoked when the source changes. */
+  const subtitleUrls = useRef([])
   /** Last compiled ad pattern, so a playlist request does not recompile it. */
   const patternRef = useRef({ source: '', regexp: null })
   /** What the last rewritten playlist cost, shown under the pattern field. */
@@ -406,6 +409,54 @@ export default function Player() {
     return () => document.removeEventListener('fullscreenchange', listener)
   }, [])
 
+  /** Drops the tracks added for the previous episode and frees their blobs. */
+  const clearSubtitles = useCallback((instance) => {
+    const tracks = instance?.remoteTextTracks?.()
+    // Backwards: removing shortens the list being walked.
+    for (let index = (tracks?.length ?? 0) - 1; index >= 0; index -= 1) {
+      instance.removeRemoteTextTrack(tracks[index])
+    }
+    subtitleUrls.current.forEach((url) => URL.revokeObjectURL(url))
+    subtitleUrls.current = []
+  }, [])
+
+  /**
+   * A `<track>` element fetches under CORS and subtitle hosts rarely allow it,
+   * so the file is fetched here — where the host permissions exempt us — and
+   * handed over as a blob. That also makes SRT work, since the text is in hand.
+   */
+  const loadSubtitles = useCallback(
+    async (instance, subtitles) => {
+      clearSubtitles(instance)
+      if (!subtitles?.length) return
+
+      await Promise.all(
+        subtitles.map(async (entry) => {
+          try {
+            const response = await fetch(entry.src)
+            if (!response.ok) throw new Error(`answered ${response.status}`)
+
+            const vtt = toVtt(await response.text())
+            if (!vtt) throw new Error('was empty')
+            if (playerRef.current !== instance) return
+
+            const url = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
+            subtitleUrls.current.push(url)
+            instance.addRemoteTextTrack(
+              { src: url, kind: 'subtitles', label: entry.label, srclang: entry.lang || 'und' },
+              // Not manual: video.js should clean the track up with the player.
+              false,
+            )
+          } catch (error) {
+            // One bad file must not cost the others, or the video.
+            console.warn(`[hls-player] subtitles ${entry.src} ${error.message}`)
+          }
+        }),
+      )
+    },
+    [clearSubtitles],
+  )
+
   // Load whenever what is playing changes.
   useEffect(() => {
     if (!ready || !source) return
@@ -440,6 +491,7 @@ export default function Player() {
       const { autoplay, muted, playbackRate } = configRef.current
       holdRef.current = Boolean(stored)
       instance.src({ src: source.src, type: manifestMime(source.src) })
+      loadSubtitles(instance, source.subtitles)
       instance.muted(Boolean(muted))
       instance.playbackRate(playbackRate)
 
@@ -455,7 +507,7 @@ export default function Player() {
     return () => {
       cancelled = true
     }
-  }, [ready, source?.id, source?.src, config.referer])
+  }, [ready, source?.id, source?.src, config.referer, loadSubtitles])
 
   useEffect(() => {
     if (!source) document.title = 'HLS Player'

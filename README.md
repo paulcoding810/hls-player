@@ -288,7 +288,40 @@ Subtitles are lifted clear of the control bar by a fixed amount. video.js drops 
 bottom edge when its own skin is disabled, which is where our bar sits; lifting them only while the
 bar is visible would make them jump every time it faded.
 
-Subtitle **files** are not supported — only what the stream itself carries.
+#### Subtitle files
+
+An episode can also name its own subtitle files, which join the same menu:
+
+```json
+{
+  "title": "Episode 1",
+  "src": "https://example.com/ep1.m3u8",
+  "subtitles": [
+    "https://example.com/ep1.en.vtt",
+    { "label": "Español", "lang": "es", "src": "https://example.com/ep1.es.srt" }
+  ]
+}
+```
+
+A bare URL is labelled from its file name; `label` and `lang` are optional. One URL on its own
+works in place of the list. **SRT is accepted as well as WebVTT** — the two differ by a header line
+and a decimal separator, and the conversion happens on the way in.
+
+The player fetches these files itself rather than pointing a `<track>` element at them: track
+loading is governed by CORS and subtitle hosts rarely send the headers, whereas the extension's
+`fetch` is exempt through its host permissions. A file that fails to load is logged and skipped —
+the others, and the video, carry on. As with the API calls, no `Referer` can be sent.
+
+In the movie form, subtitle files follow the video URL on the same line, separated by spaces:
+
+```
+Episode 1 | https://example.com/ep1.m3u8 https://example.com/ep1.en.vtt
+```
+
+A URL cannot contain an unencoded space, so the first one is always the video and the rest are
+subtitles — a line with a single URL means exactly what it always did. They are labelled from
+their file names; **Paste JSON instead** is where a label or language can be set. A mistyped
+subtitle URL is reported like any other bad line rather than quietly dropped.
 
 Speed steps through the same list the menu offers — 0.5× to 2× — rather than by a fixed amount,
 so the keys and the menu can never disagree about which speeds exist. `<` and `>` work too, being

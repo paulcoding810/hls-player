@@ -1,6 +1,7 @@
 import { libraryStorage } from '.'
 import { clearProgressFor } from './progress'
 import { compilePattern } from '@/utils/playlist'
+import { readSubtitles } from '@/utils/subtitles'
 import { normalizeReferer, normalizeSource } from '@/utils/url'
 
 /**
@@ -50,6 +51,7 @@ export function buildEpisodes(sources, offset = 0) {
     id: crypto.randomUUID(),
     title: source.title?.trim() || `Episode ${offset + position + 1}`,
     src: source.src,
+    ...(source.subtitles?.length ? { subtitles: source.subtitles } : {}),
   }))
 }
 
@@ -88,7 +90,12 @@ export function parseMovieJson(text) {
     const value = typeof entry === 'string' ? entry : (entry?.src ?? entry?.url)
     const src = normalizeSource(value)
     if (!src) throw new Error(`Episode ${position + 1} has no valid http(s) URL.`)
-    return { title: typeof entry?.title === 'string' ? entry.title.trim() : '', src }
+    const subtitles = readSubtitles(entry?.subtitles, normalizeSource)
+    return {
+      title: typeof entry?.title === 'string' ? entry.title.trim() : '',
+      src,
+      ...(subtitles.length ? { subtitles } : {}),
+    }
   })
 
   const adPattern = typeof raw.adPattern === 'string' ? raw.adPattern.trim() : ''
@@ -128,7 +135,11 @@ export function movieToJson(movie) {
       skipLeading: optional(movie.skipLeading),
       skipTrailing: optional(movie.skipTrailing),
       autoSkip: optional(movie.autoSkip),
-      episodes: (movie.episodes ?? []).map(({ title, src }) => ({ title, src })),
+      episodes: (movie.episodes ?? []).map(({ title, src, subtitles }) => ({
+        title,
+        src,
+        ...(subtitles?.length ? { subtitles } : {}),
+      })),
     },
     null,
     2,
@@ -179,10 +190,13 @@ export async function setEpisodes(movieId, sources) {
   const known = new Map(movie.episodes.map((episode) => [episode.src, episode]))
   const episodes = sources.map((source, position) => {
     const existing = known.get(source.src)
+    // A refresh that brings no subtitles keeps the ones already stored.
+    const subtitles = source.subtitles?.length ? source.subtitles : existing?.subtitles
     return {
       id: existing?.id ?? crypto.randomUUID(),
       title: source.title?.trim() || existing?.title || `Episode ${position + 1}`,
       src: source.src,
+      ...(subtitles?.length ? { subtitles } : {}),
     }
   })
 

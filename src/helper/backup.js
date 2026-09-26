@@ -2,6 +2,7 @@ import { EMPTY_MOVIE, getLibrary, saveLibrary } from './library'
 import { getAllProgress, mergeProgress } from './progress'
 import { EMPTY_PLUGIN, getPlugins, savePlugins } from './plugins'
 import { getSettings, saveSettings } from './settings'
+import { readSubtitles } from '@/utils/subtitles'
 import { normalizeSource } from '@/utils/url'
 
 export const BACKUP_FORMAT = 'hls-player-backup'
@@ -46,11 +47,15 @@ function sanitizeMovie(raw) {
   if (!raw || typeof raw !== 'object') return null
 
   const episodes = (Array.isArray(raw.episodes) ? raw.episodes : [])
-    .map((episode, position) => ({
-      id: string(episode?.id) || crypto.randomUUID(),
-      title: string(episode?.title).trim() || `Episode ${position + 1}`,
-      src: normalizeSource(episode?.src),
-    }))
+    .map((episode, position) => {
+      const subtitles = readSubtitles(episode?.subtitles, normalizeSource)
+      return {
+        id: string(episode?.id) || crypto.randomUUID(),
+        title: string(episode?.title).trim() || `Episode ${position + 1}`,
+        src: normalizeSource(episode?.src),
+        ...(subtitles.length ? { subtitles } : {}),
+      }
+    })
     .filter((episode) => episode.src)
 
   // A movie with no playable episode is not worth importing.
