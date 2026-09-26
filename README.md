@@ -238,8 +238,8 @@ episode, and then to the library.
 
 The control bar is the extension's own — video.js supplies the playback engine, not the UI. It
 carries play/pause, previous/next episode, elapsed and total time (a live stream shows **Live** and no
-seek bar), a seek bar with the buffered range behind the played one, volume, speed, the quality
-menu and fullscreen. It fades out 2.5s after the pointer goes idle during playback and comes back
+seek bar), a seek bar with the buffered range behind the played one, volume, speed, subtitles, the
+quality menu and fullscreen. It fades out 2.5s after the pointer goes idle during playback and comes back
 on the first move.
 
 | Key           | Action                                    |
@@ -248,12 +248,27 @@ on the first move.
 | `←` / `→`     | seek 5s                                   |
 | `↑` / `↓`     | volume                                    |
 | `m`           | mute                                      |
+| `c`           | subtitles on / off                        |
 | `,` / `.`     | slower / faster                           |
 | `f`           | fullscreen                                |
 | `p` / `n`     | previous / next episode                   |
 | `esc`         | close the panel, else back to the library |
 
 Clicking the video toggles playback, double-clicking toggles fullscreen.
+
+### Subtitles
+
+A stream that carries subtitle or caption tracks — an HLS `SUBTITLES` group, or in-band 608/708
+captions — gets a menu in the control bar listing them, plus **Subtitles off**. `c` turns the first
+track on and off without going to the menu. The menu only appears when the stream actually has a
+track, and the list is watched rather than read once, since tracks arrive after the manifest is
+parsed and a rendition change can add or drop them.
+
+Subtitles are lifted clear of the control bar by a fixed amount. video.js drops them almost to the
+bottom edge when its own skin is disabled, which is where our bar sits; lifting them only while the
+bar is visible would make them jump every time it faded.
+
+Subtitle **files** are not supported — only what the stream itself carries.
 
 Speed steps through the same list the menu offers — 0.5× to 2× — rather than by a fixed amount,
 so the keys and the menu can never disagree about which speeds exist. `<` and `>` work too, being

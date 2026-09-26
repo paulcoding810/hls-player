@@ -86,6 +86,8 @@ export default function Controls({
   const pendingSeek = useRef(null)
   /** Where the pointer sits over the seek bar, as a 0-1 ratio of the track. */
   const [hover, setHover] = useState(null)
+  /** Subtitle and caption tracks the stream carries, and which is showing. */
+  const [tracks, setTracks] = useState([])
 
   useEffect(() => {
     if (!player) return
@@ -93,6 +95,38 @@ export default function Controls({
     PLAYER_EVENTS.forEach((event) => player.on(event, sync))
     sync()
     return () => PLAYER_EVENTS.forEach((event) => player.off(event, sync))
+  }, [player])
+
+  // Tracks arrive after the manifest is parsed, and a rendition change can add
+  // or drop them, so the list is watched rather than read once.
+  useEffect(() => {
+    if (!player) return undefined
+    const list = player.textTracks()
+
+    const sync = () => {
+      const found = []
+      for (let index = 0; index < list.length; index += 1) {
+        const track = list[index]
+        if (track.kind !== 'subtitles' && track.kind !== 'captions') continue
+        found.push({
+          id: track.id || `${track.language}-${index}`,
+          label: track.label || track.language || `Track ${found.length + 1}`,
+          track,
+        })
+      }
+      setTracks(found)
+    }
+
+    list.addEventListener('addtrack', sync)
+    list.addEventListener('removetrack', sync)
+    list.addEventListener('change', sync)
+    sync()
+
+    return () => {
+      list.removeEventListener('addtrack', sync)
+      list.removeEventListener('removetrack', sync)
+      list.removeEventListener('change', sync)
+    }
   }, [player])
 
   if (!player) return null
@@ -138,6 +172,17 @@ export default function Controls({
 
     const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left - THUMB_SIZE / 2) / usable))
     setHover(ratio)
+  }
+
+  const showing = tracks.find((entry) => entry.track.mode === 'showing')
+
+  /** One track at a time, so picking a second turns the first off. */
+  const chooseTrack = (id) => {
+    tracks.forEach((entry) => {
+      entry.track.mode = entry.id === id ? 'showing' : 'disabled'
+    })
+    // `change` does not fire for every engine, so the list is re-read here too.
+    setTracks((current) => [...current])
   }
 
   const cancelSeek = () => {
@@ -258,6 +303,23 @@ export default function Controls({
               </option>
             ))}
           </select>
+
+          {tracks.length > 0 && (
+            <select
+              value={showing?.id ?? 'off'}
+              onChange={(event) => chooseTrack(event.target.value)}
+              aria-label="Subtitles"
+              title="Subtitles (c)"
+              className={selectClass}
+            >
+              <option value="off">Subtitles off</option>
+              {tracks.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          )}
 
           {levels.length > 1 && (
             <select

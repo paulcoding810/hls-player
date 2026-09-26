@@ -134,7 +134,9 @@ the movie form itself (`MovieFields.jsx`) renders both as a modal on the library
 the player's side panel.
 
 video.js is the HLS engine only — it is created with `controls: false`, `bigPlayButton: false` and
-`errorDisplay: false`. It is imported as `video.js/dist/alt/video.core.js` (a
+`errorDisplay: false`. Its `TextTrackDisplay` is the exception that stays: subtitles are rendered by
+video.js (`nativeTextTracks: false`) and listed in `Controls.jsx` from `player.textTracks()`, with
+`Player.css` lifting them clear of the control bar. It is imported as `video.js/dist/alt/video.core.js` (a
 `vite.config.js` alias) plus VHS's `videojs-http-streaming-sync-workers.js`: the stock bundle
 builds its transmuxer and decrypter as `blob:` workers, which MV3's `script-src 'self'` forbids —
 Firefox blocks them outright. The sync build runs that same worker code on the page. Do not import

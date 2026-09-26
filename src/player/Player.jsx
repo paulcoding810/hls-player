@@ -73,6 +73,9 @@ const VIDEO_JS_OPTIONS = {
     vhs: { overrideNative: true, maxPlaylistRetries: MAX_PLAYLIST_RETRIES },
     nativeAudioTracks: false,
     nativeVideoTracks: false,
+    // Emulated tracks too, so video.js renders and reports subtitles the same
+    // way on both engines rather than leaving it to the browser.
+    nativeTextTracks: false,
   },
 }
 
@@ -666,6 +669,21 @@ export default function Player() {
         ArrowDown: () => setVolume(-0.05),
         m: () => instance.muted(!instance.muted()),
         f: toggleFullscreen,
+        // Captions on or off; which track is the menu's job.
+        c: () => {
+          const list = instance.textTracks()
+          const subtitles = []
+          for (let index = 0; index < list.length; index += 1) {
+            const track = list[index]
+            if (track.kind === 'subtitles' || track.kind === 'captions') subtitles.push(track)
+          }
+          if (!subtitles.length) return
+
+          const showing = subtitles.find((track) => track.mode === 'showing')
+          subtitles.forEach((track) => {
+            track.mode = !showing && track === subtitles[0] ? 'showing' : 'disabled'
+          })
+        },
         '<': () => stepRate(-1),
         '>': () => stepRate(1),
         ',': () => stepRate(-1),

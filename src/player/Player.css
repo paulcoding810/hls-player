@@ -7,6 +7,15 @@
   font-family: inherit;
 }
 
+/* With `controls: false` video.js drops captions to `bottom: 1em`, which is
+   behind our own control bar. Lift them clear of it, and by a constant amount:
+   the bar fades in and out, and subtitles that jumped with it would be worse
+   than ones sitting slightly high. */
+.player-shell .video-js.vjs-controls-disabled .vjs-text-track-display,
+.player-shell .video-js.vjs-user-inactive.vjs-playing .vjs-text-track-display {
+  bottom: 4.5rem;
+}
+
 .player-shell .vjs-loading-spinner {
   border-color: var(--color-primary);
   border-top-color: var(--color-line-strong);
