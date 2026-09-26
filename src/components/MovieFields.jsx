@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import MovieConfig from './MovieConfig'
 import {
@@ -9,7 +9,7 @@ import {
   labelClass,
   linkButtonClass,
 } from './ui'
-import { EMPTY_MOVIE, parseMovieJson } from '@/helper/library'
+import { EMPTY_MOVIE, movieToJson, parseMovieJson } from '@/helper/library'
 import { compilePattern } from '@/utils/playlist'
 import { normalizeReferer, parseEpisodeLines } from '@/utils/url'
 
@@ -51,6 +51,13 @@ export default function MovieFields({
   // Pasting is an alternative to filling the form, so it is offered only when
   // adding — editing already has the saved values laid out in the fields.
   const [json, setJson] = useState(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (!copied) return undefined
+    const timer = setTimeout(() => setCopied(false), 2000)
+    return () => clearTimeout(timer)
+  }, [copied])
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -95,9 +102,24 @@ export default function MovieFields({
     }
   }
 
+  /** What is on screen, not what was last saved — unsaved edits come too. */
+  const copyJson = async () => {
+    try {
+      const { episodes } = parseEpisodeLines(episodesText)
+      await navigator.clipboard.writeText(movieToJson({ ...draft, episodes }))
+      setCopied(true)
+    } catch (copyError) {
+      setError(`Could not copy: ${copyError.message}`)
+    }
+  }
+
   const actions = (
     <div className="flex items-center justify-end gap-2">
-      {!movie && (
+      {movie ? (
+        <button type="button" onClick={copyJson} className={`${linkButtonClass} mr-auto`}>
+          {copied ? 'Copied' : 'Copy JSON'}
+        </button>
+      ) : (
         <button
           type="button"
           className={`${linkButtonClass} mr-auto`}
