@@ -72,6 +72,19 @@ for Tailwind's stock palette (`neutral-800`, `sky-600`, `red-500`, …) — only
 | `text-danger` / `bg-danger-soft`        | playback and permission errors            |
 | `text-warn` / `bg-warn-soft`            | "action needed" notices                   |
 
+## Notices
+
+Two kinds, and the difference is whether the message is an **event** or a **state**.
+
+Something that just happened — copied, imported, 3 new episodes, that request failed — is a
+**toast**: `src/components/Toast.jsx`, fixed over the page, auto-dismissing. It must never sit in
+the layout, because content that jumps when a message appears is worse than the message is useful.
+Pages hold it as `notice = { tone: 'warn' | 'danger', message }` and render one `<Toast>`.
+
+Something that is still true — a playback error, a host permission not granted — is a **banner**
+in the flow (`dangerBannerClass` / `warnBannerClass`), where it stays until the condition does.
+A state that timed out unnoticed is a bug.
+
 Red is the **brand** color, so a red fill reads as "do this", not "careful". Destructive actions
 (Clear playlist, remove item) therefore use `ghostButtonClass` or `iconButtonClass` — never a solid
 red button. Errors are a tinted band with `text-danger`, never a red-filled block.

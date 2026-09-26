@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import ConfirmDialog from '@components/ConfirmDialog'
 import MovieForm from '@components/MovieForm'
 import SearchResults from '@components/SearchResults'
+import Toast from '@components/Toast'
 import {
   CheckIcon,
   CloseIcon,
@@ -17,12 +18,10 @@ import {
 } from '@components/icons'
 import {
   buttonClass,
-  dangerBannerClass,
   ghostButtonClass,
   iconButtonClass,
   inputClass,
   selectClass,
-  warnBannerClass,
 } from '@components/ui'
 import { SORT_ORDERS } from '@/helper/constants'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
@@ -512,13 +511,7 @@ export default function Gallery() {
         </form>
       )}
 
-      {notice && (
-        <p
-          className={`${notice.tone === 'danger' ? dangerBannerClass : warnBannerClass} border-line mb-6 rounded-md border`}
-        >
-          {notice.message}
-        </p>
-      )}
+      <Toast notice={notice} onDismiss={() => setNotice(null)} />
 
       {groups !== null ? (
         <SearchResults

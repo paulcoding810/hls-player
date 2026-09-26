@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import ConfirmDialog from '@components/ConfirmDialog'
 import PluginForm from '@components/PluginForm'
 import SettingsPanel from '@components/SettingsPanel'
+import Toast from '@components/Toast'
 import {
   AlertIcon,
   CopyIcon,
@@ -16,7 +17,6 @@ import {
 import {
   buttonClass,
   checkboxClass,
-  dangerBannerClass,
   ghostButtonClass,
   iconButtonClass,
   warnBannerClass,
@@ -279,21 +279,14 @@ export const Options = () => {
           )}
         </div>
 
-        {notice && (
-          <p
-            className={`${notice.tone === 'danger' ? dangerBannerClass : warnBannerClass} border-line mt-3 rounded-md border`}
-          >
-            <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
-            {notice.message}
-          </p>
-        )}
-
         <p className="text-ink-muted mt-3 text-sm">
           {stats.movies === 0
             ? 'The library is empty.'
             : `${stats.movies} movie(s), ${stats.episodes} episode(s).`}
         </p>
       </section>
+
+      <Toast notice={notice} onDismiss={() => setNotice(null)} />
 
       {editing && (
         <PluginForm plugin={editingPlugin} onSave={savePlugin} onClose={() => setEditing(null)} />

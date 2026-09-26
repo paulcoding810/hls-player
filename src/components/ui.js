@@ -44,6 +44,23 @@ export const dialogClass =
   'm-auto rounded-md border border-line bg-panel p-5 text-ink shadow-xl backdrop:bg-black/70'
 
 /*
+  A toast reports something that just happened and then goes away. It floats
+  clear of the layout, so unlike a banner it carries its own border and shadow
+  — nothing around it should move because a message appeared.
+*/
+export const toastClass =
+  // `min-w-0` so it shrinks below `max-w-lg` on a narrow window instead of
+  // running off the edge — a flex item will not shrink past its content.
+  // `items-center`, not `items-start`: the dismiss button is 28px tall against
+  // a 20px line box, so aligning their top edges drops the icon below the text.
+  'pointer-events-auto flex min-w-0 max-w-lg items-center gap-2 rounded-md border border-line px-4 py-2 text-left text-sm shadow-xl backdrop-blur-sm'
+
+export const toastToneClass = {
+  danger: 'bg-danger-soft text-danger',
+  warn: 'bg-warn-soft text-warn',
+}
+
+/*
   Banners carry no border of their own — the caller adds the edge it needs
   (`border-b border-line` in a page bar, `rounded-md border border-line` inline)
   so the two never fight over Tailwind's rule order.
