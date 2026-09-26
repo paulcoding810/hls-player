@@ -58,6 +58,14 @@
     color: var(--color-ink);
   }
 
+  /* Chrome draws its own clear button for `type="search"`; Firefox draws
+     none. The search bar supplies one, so the platform's is hidden rather
+     than leaving the two engines looking different. */
+  input[type='search']::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
   ::selection {
     background-color: var(--color-primary);
     color: #fff;

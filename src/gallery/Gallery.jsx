@@ -5,6 +5,7 @@ import MovieForm from '@components/MovieForm'
 import SearchResults from '@components/SearchResults'
 import {
   CheckIcon,
+  CloseIcon,
   EditIcon,
   FilmIcon,
   PlayIcon,
@@ -458,18 +459,35 @@ export default function Gallery() {
 
       {plugins.some((plugin) => plugin.enabled) && (
         <form onSubmit={runSearch} className="mb-6 flex items-center gap-2">
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value)
-              // Emptying the box puts the library back.
-              if (!event.target.value.trim()) setGroups(null)
-            }}
-            placeholder="Search your sources…"
-            aria-label="Search sources"
-            className={inputClass}
-          />
+          <div className="relative flex-1">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                // Emptying the box puts the library back.
+                if (!event.target.value.trim()) setGroups(null)
+              }}
+              placeholder="Search your sources…"
+              aria-label="Search sources"
+              className={`${inputClass} pr-9`}
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('')
+                  setGroups(null)
+                  setNotice(null)
+                }}
+                className={`${iconButtonClass} absolute inset-y-0 right-1 my-auto`}
+                aria-label="Clear the search"
+                title="Clear"
+              >
+                <CloseIcon />
+              </button>
+            )}
+          </div>
           <button type="submit" disabled={!query.trim()} className={ghostButtonClass}>
             <SearchIcon className="h-3.5 w-3.5" />
             Search
