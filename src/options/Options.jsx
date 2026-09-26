@@ -25,9 +25,13 @@ import { clearLibrary, getLibrary } from '@/helper/library'
 import { addPlugin, getPlugins, removePlugin, updatePlugin } from '@/helper/plugins'
 import { openGallery } from '@/helper/player'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
+import api from '@/utils/api'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
 
 import '../index.css'
+
+/** From the manifest, so it is the version actually running, not a build-time copy. */
+const VERSION = api.runtime?.getManifest?.()?.version ?? ''
 
 function countEpisodes(library) {
   return library.movies.reduce((total, movie) => total + movie.episodes.length, 0)
@@ -135,6 +139,7 @@ export const Options = () => {
       <header className="mb-6 flex items-center gap-2">
         <img src="/img/logo-32.png" alt="" className="h-6 w-6" />
         <h1 className="text-base font-semibold">HLS Player</h1>
+        {VERSION && <span className="text-ink-faint text-xs">v{VERSION}</span>}
         <button type="button" onClick={() => openGallery()} className={`${buttonClass} ml-auto`}>
           <LibraryIcon />
           Open library
