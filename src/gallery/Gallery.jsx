@@ -21,6 +21,7 @@ import {
   iconButtonClass,
   inputClass,
   selectClass,
+  warnBannerClass,
 } from '@components/ui'
 import { SORT_ORDERS } from '@/helper/constants'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
@@ -32,6 +33,7 @@ import {
   getLibrary,
   removeMovie,
   markWatched,
+  movieToJson,
   resumeEpisodeId,
   setEpisodes,
   sortMovies,
@@ -227,7 +229,10 @@ export default function Gallery() {
   const [adding, setAdding] = useState('')
   /** Plugin id whose next page is in flight. */
   const [loadingMore, setLoadingMore] = useState('')
-  const [notice, setNotice] = useState('')
+  /** `pluginId:itemId` of the result being copied. */
+  const [copying, setCopying] = useState('')
+  /** `{ tone, message }`; errors are `danger`, confirmations `warn`. */
+  const [notice, setNotice] = useState(null)
 
   useEffect(() => {
     ;(async () => {
@@ -284,7 +289,7 @@ export default function Gallery() {
       return
     }
 
-    setNotice('')
+    setNotice(null)
     setSearching(true)
     try {
       setGroups(await searchAll(plugins, term))
@@ -295,14 +300,14 @@ export default function Gallery() {
 
   const showMore = async (group) => {
     setLoadingMore(group.plugin.id)
-    setNotice('')
+    setNotice(null)
     try {
       const next = await loadMore(group, query.trim())
       setGroups((current) =>
         current.map((item) => (item.plugin.id === group.plugin.id ? next : item)),
       )
     } catch (error) {
-      setNotice(error.message)
+      setNotice({ tone: 'danger', message: error.message })
       // A page that failed should not leave More offering itself for ever.
       setGroups((current) =>
         current.map((item) =>
@@ -314,10 +319,39 @@ export default function Gallery() {
     }
   }
 
+  /** The same JSON the Add movie form's Paste JSON mode reads back. */
+  const copyResult = async (plugin, result) => {
+    const key = `${plugin.id}:${result.id}`
+    setCopying(key)
+    setNotice(null)
+    try {
+      const episodes = await fetchEpisodes(plugin, result)
+      if (!episodes.length) throw new Error(`${plugin.name} returned no episodes for this title.`)
+
+      await navigator.clipboard.writeText(
+        movieToJson({
+          title: result.title,
+          poster: result.poster,
+          referer: plugin.referer,
+          adPattern: plugin.adPattern,
+          episodes,
+        }),
+      )
+      setNotice({
+        tone: 'warn',
+        message: `Copied “${result.title}” as JSON — ${episodes.length} episode(s).`,
+      })
+    } catch (error) {
+      setNotice({ tone: 'danger', message: `Could not copy: ${error.message}` })
+    } finally {
+      setCopying('')
+    }
+  }
+
   const addResult = async (plugin, result) => {
     const key = `${plugin.id}:${result.id}`
     setAdding(key)
-    setNotice('')
+    setNotice(null)
     try {
       const episodes = await fetchEpisodes(plugin, result)
       if (!episodes.length) throw new Error(`${plugin.name} returned no episodes for this title.`)
@@ -332,7 +366,7 @@ export default function Gallery() {
       })
       await refresh()
     } catch (error) {
-      setNotice(error.message)
+      setNotice({ tone: 'danger', message: error.message })
     } finally {
       setAdding('')
     }
@@ -345,17 +379,18 @@ export default function Gallery() {
 
   const handleRefresh = async (movie) => {
     setAdding(movie.id)
-    setNotice('')
+    setNotice(null)
     try {
       const { added: fresh } = await refreshMovie(movie, plugins)
       await refresh()
-      setNotice(
-        fresh
+      setNotice({
+        tone: 'warn',
+        message: fresh
           ? `${movie.title}: ${fresh} new episode(s).`
           : `${movie.title} is already up to date.`,
-      )
+      })
     } catch (error) {
-      setNotice(error.message)
+      setNotice({ tone: 'danger', message: error.message })
     } finally {
       setAdding('')
     }
@@ -443,7 +478,11 @@ export default function Gallery() {
       )}
 
       {notice && (
-        <p className={`${dangerBannerClass} border-line mb-6 rounded-md border`}>{notice}</p>
+        <p
+          className={`${notice.tone === 'danger' ? dangerBannerClass : warnBannerClass} border-line mb-6 rounded-md border`}
+        >
+          {notice.message}
+        </p>
       )}
 
       {groups !== null ? (
@@ -455,6 +494,8 @@ export default function Gallery() {
           onAdd={addResult}
           onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
           onMore={showMore}
+          onCopy={copyResult}
+          copying={copying}
           loadingMore={loadingMore}
         />
       ) : (

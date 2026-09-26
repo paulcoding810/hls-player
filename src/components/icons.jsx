@@ -156,6 +156,13 @@ export const SearchIcon = (props) => (
   </Icon>
 )
 
+export const CopyIcon = (props) => (
+  <Icon {...props}>
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M15 5.5A1.5 1.5 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 5.5 15" />
+  </Icon>
+)
+
 export const CheckIcon = (props) => (
   <Icon {...props}>
     <path d="M5 12.5l4.5 4.5L19 7" />

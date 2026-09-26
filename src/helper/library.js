@@ -111,6 +111,30 @@ export function parseMovieJson(text) {
   }
 }
 
+/**
+ * A movie as the text `parseMovieJson` reads back. Blank fields are left out
+ * rather than written as empty — in this shape absent means "inherit the
+ * global default", which is what a blank field means everywhere else.
+ */
+export function movieToJson(movie) {
+  const optional = (value) => (value === '' || value === null ? undefined : value)
+
+  return JSON.stringify(
+    {
+      title: movie.title,
+      poster: optional(movie.poster),
+      referer: optional(movie.referer),
+      adPattern: optional(movie.adPattern),
+      skipLeading: optional(movie.skipLeading),
+      skipTrailing: optional(movie.skipTrailing),
+      autoSkip: optional(movie.autoSkip),
+      episodes: (movie.episodes ?? []).map(({ title, src }) => ({ title, src })),
+    },
+    null,
+    2,
+  )
+}
+
 export async function addMovie({ episodes = [], ...config }) {
   const library = await getLibrary()
   const movie = {

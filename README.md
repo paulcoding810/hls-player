@@ -190,6 +190,11 @@ Searching queries every enabled source at once and groups the results. A source 
 its error in its own group instead of taking the search down. A result already in the library
 offers **Watch** instead of **Add**.
 
+Each result also has a **copy** button, which fetches its episodes and puts the movie on the
+clipboard in the same shape **Paste JSON instead** reads back — so a title can be shared, kept, or
+tweaked by hand before adding. Blank fields are left out rather than written empty, since absent
+means "inherit the global default" in that shape.
+
 **More** under a group fetches that source's next page and appends it — each source pages
 independently, since one may have more to give than another. Results already shown are not
 repeated, which is also what stops a search URL with no `{page}` in it: the same page comes back,

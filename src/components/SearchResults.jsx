@@ -1,5 +1,5 @@
-import { FilmIcon, PlayIcon, PlusIcon } from './icons'
-import { dangerBannerClass, ghostButtonClass } from './ui'
+import { CopyIcon, FilmIcon, PlayIcon, PlusIcon } from './icons'
+import { dangerBannerClass, ghostButtonClass, iconButtonClass } from './ui'
 
 /**
  * Search results from every enabled source, grouped by the source they came
@@ -14,6 +14,8 @@ export default function SearchResults({
   onAdd,
   onWatch,
   onMore,
+  onCopy,
+  copying,
   loadingMore,
 }) {
   const total = groups.reduce((count, group) => count + group.results.length, 0)
@@ -61,6 +63,17 @@ export default function SearchResults({
                 <h3 className="min-w-0 flex-1 truncate text-sm" title={result.title}>
                   {result.title}
                 </h3>
+
+                <button
+                  type="button"
+                  onClick={() => onCopy(group.plugin, result)}
+                  disabled={copying === key}
+                  className={iconButtonClass}
+                  aria-label={`Copy ${result.title} as JSON`}
+                  title="Copy as JSON"
+                >
+                  <CopyIcon />
+                </button>
 
                 {movie ? (
                   <button type="button" onClick={() => onWatch(movie)} className={ghostButtonClass}>
