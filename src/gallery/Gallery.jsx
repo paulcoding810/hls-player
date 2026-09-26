@@ -411,7 +411,6 @@ export default function Gallery() {
       await updateMovie(editing, config)
       await setEpisodes(editing, episodes)
     }
-    if (config.referer !== settings.lastReferer) await saveSettings({ lastReferer: config.referer })
     await refresh()
   }
 

@@ -41,12 +41,7 @@ export default function MovieFields({
   idPrefix = 'movie',
   removed,
 }) {
-  // A new movie starts from the Referer last used, which is usually the same site.
-  const [draft, setDraft] = useState({
-    ...EMPTY_MOVIE,
-    referer: defaults.lastReferer ?? '',
-    ...(movie ?? {}),
-  })
+  const [draft, setDraft] = useState({ ...EMPTY_MOVIE, ...(movie ?? {}) })
   // Editing starts from the saved episodes, so they can be renamed, fixed or
   // reordered as text; `parseEpisodeLines` splits on the last `|` to read it back,
   // then on whitespace, so any subtitle files follow the video URL on the line.

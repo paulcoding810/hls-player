@@ -72,8 +72,8 @@ A line may be a bare URL or `Title | URL`; untitled episodes are numbered. Cards
 count and where you left off, and **Resume** opens that episode. The pencil reopens the same form
 with everything filled in — the episode box holds the saved list as `Title | URL` lines, so
 episodes are renamed, corrected, reordered or removed by editing the text. An episode keeps its
-watched position as long as its URL stays the same. The `Referer` of a new movie is prefilled with
-the one you used last.
+watched position as long as its URL stays the same. A new movie starts with its `Referer` blank,
+which means it inherits the global default rather than whichever one you typed last.
 
 Each movie carries its own `Referer`, _skip intro_ and _skip outro_. Leave a field blank and it
 inherits the global default shown in it, so a series that needs a particular `Referer` or has a

@@ -6,8 +6,6 @@ export const DEFAULT_SETTINGS = {
   referer: '',
   /** Regex matching the URI of an SSAI ad segment; blank strips nothing. */
   adPattern: '',
-  /** Remembered UI state: the Referer last typed into the add form. */
-  lastReferer: '',
   /** Take over navigations to a `.m3u8` or `.mpd` URL. */
   grabLinks: true,
   /** How the library grid is arranged — one of `SORT_ORDERS`. */
@@ -36,7 +34,6 @@ export function sanitizeSettings(settings) {
       ? settings.gallerySort
       : DEFAULT_SETTINGS.gallerySort,
     adPattern: (settings.adPattern ?? '').trim(),
-    lastReferer: (settings.lastReferer ?? '').trim(),
     autoplay: Boolean(settings.autoplay),
     muted: Boolean(settings.muted),
     autoSkip: Boolean(settings.autoSkip),
