@@ -1,14 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
+import ModeSwitch from './ModeSwitch'
 import MovieConfig from './MovieConfig'
-import {
-  buttonClass,
-  ghostButtonClass,
-  helpClass,
-  inputClass,
-  labelClass,
-  linkButtonClass,
-} from './ui'
+import { buttonClass, ghostButtonClass, helpClass, inputClass, labelClass } from './ui'
 import { EMPTY_MOVIE, movieToJson, parseMovieJson } from '@/helper/library'
 import { compilePattern } from '@/utils/playlist'
 import { normalizeReferer, parseEpisodeLines } from '@/utils/url'
@@ -22,6 +16,17 @@ const JSON_EXAMPLE = `{
     { "title": "Episode 2", "src": "https://example.com/ep2.mpd" }
   ]
 }`
+
+/** Episodes as the textarea holds them: `Title | URL` plus any subtitle URLs. */
+function episodesToText(episodes) {
+  return (episodes ?? [])
+    .map((episode) =>
+      [`${episode.title} | ${episode.src}`, ...(episode.subtitles ?? []).map((s) => s.src)].join(
+        ' ',
+      ),
+    )
+    .join('\n')
+}
 
 /**
  * The movie form itself, with no chrome of its own — `MovieForm` wraps it in a
@@ -45,26 +50,11 @@ export default function MovieFields({
   // Editing starts from the saved episodes, so they can be renamed, fixed or
   // reordered as text; `parseEpisodeLines` splits on the last `|` to read it back,
   // then on whitespace, so any subtitle files follow the video URL on the line.
-  const [episodesText, setEpisodesText] = useState(
-    (movie?.episodes ?? [])
-      .map((episode) =>
-        [`${episode.title} | ${episode.src}`, ...(episode.subtitles ?? []).map((s) => s.src)].join(
-          ' ',
-        ),
-      )
-      .join('\n'),
-  )
+  const [episodesText, setEpisodesText] = useState(episodesToText(movie?.episodes))
   const [error, setError] = useState('')
   // Pasting is an alternative to filling the form, so it is offered only when
   // adding — editing already has the saved values laid out in the fields.
   const [json, setJson] = useState(null)
-  const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    if (!copied) return undefined
-    const timer = setTimeout(() => setCopied(false), 2000)
-    return () => clearTimeout(timer)
-  }, [copied])
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -109,35 +99,57 @@ export default function MovieFields({
     }
   }
 
-  /** What is on screen, not what was last saved — unsaved edits come too. */
-  const copyJson = async () => {
-    try {
+  /**
+   * The two views edit the same movie, so each hands its state to the other:
+   * opening JSON serialises what is on screen, and returning to the form reads
+   * it back. Discarding either way would silently lose whatever was typed.
+   */
+  const toggleJson = () => {
+    setError('')
+
+    if (json === null) {
       const { episodes } = parseEpisodeLines(episodesText)
-      await navigator.clipboard.writeText(movieToJson({ ...draft, episodes }))
-      setCopied(true)
-    } catch (copyError) {
-      setError(`Could not copy: ${copyError.message}`)
+      // A new movie starts from the placeholder rather than an empty skeleton.
+      setJson(movie ? movieToJson({ ...draft, episodes }) : '')
+      return
+    }
+
+    if (!json.trim()) {
+      setJson(null)
+      return
+    }
+
+    try {
+      const { episodes, ...config } = parseMovieJson(json)
+      setDraft({ ...draft, ...config })
+      setEpisodesText(episodesToText(episodes))
+      setJson(null)
+    } catch (jsonError) {
+      // Stay put: switching back would throw the edited text away.
+      setError(jsonError.message)
     }
   }
 
+  const mode = json === null ? 'form' : 'json'
+  /** Both directions are the same hand-off, so re-picking the current mode is a no-op. */
+  const chooseMode = (next) => {
+    if (next !== mode) toggleJson()
+  }
+
+  const modeSwitch = (
+    <ModeSwitch
+      value={mode}
+      onChange={chooseMode}
+      label="Editing mode"
+      options={[
+        { value: 'form', label: 'Form' },
+        { value: 'json', label: 'JSON' },
+      ]}
+    />
+  )
+
   const actions = (
     <div className="flex items-center justify-end gap-2">
-      {movie ? (
-        <button type="button" onClick={copyJson} className={`${linkButtonClass} mr-auto`}>
-          {copied ? 'Copied' : 'Copy JSON'}
-        </button>
-      ) : (
-        <button
-          type="button"
-          className={`${linkButtonClass} mr-auto`}
-          onClick={() => {
-            setError('')
-            setJson(json === null ? '' : null)
-          }}
-        >
-          {json === null ? 'Paste JSON instead' : 'Use the form instead'}
-        </button>
-      )}
       <button type="button" onClick={onCancel} className={ghostButtonClass}>
         Cancel
       </button>
@@ -150,6 +162,8 @@ export default function MovieFields({
   if (json !== null) {
     return (
       <form onSubmit={handleJsonSubmit} className="flex flex-col gap-4">
+        {modeSwitch}
+
         <div>
           <label className={labelClass} htmlFor={`${idPrefix}-json`}>
             Movie JSON
@@ -179,6 +193,8 @@ export default function MovieFields({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {modeSwitch}
+
       <div>
         <label className={labelClass} htmlFor={`${idPrefix}-title`}>
           Title

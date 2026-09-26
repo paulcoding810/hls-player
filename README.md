@@ -114,12 +114,16 @@ Only the display order changes — the library keeps its own order, so nothing i
 sorting. Movies stored before a given timestamp existed sort as oldest, except that ties still read
 newest first.
 
-### Copying a movie as JSON
+### Editing a movie as JSON
 
-Editing a movie — from the library or the player's side panel — offers **Copy JSON**, which puts
-it on the clipboard in the shape below. It copies what is on screen, including edits you have not
-saved yet, so the episode list comes from the textarea rather than from storage. Local-only fields
-(`id`, `addedAt`, which source added it, whether it is watched) are left out.
+Editing a movie — from the library or the player's side panel — offers **Edit as JSON**, which
+swaps the fields for the text below. **Use the form instead** reads it back, so the two views are
+the same movie and neither discards what the other was holding; invalid JSON keeps you in the
+editor with the error rather than throwing the text away. Local-only fields (`id`, `addedAt`,
+which source added it, whether it is watched) are left out, so the text is also what you copy to
+share it.
+
+Sources work the same way on the options page.
 
 ### Adding a movie as JSON
 

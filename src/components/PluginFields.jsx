@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import ModeSwitch from './ModeSwitch'
 import {
   buttonClass,
   checkboxClass,
@@ -8,9 +9,8 @@ import {
   helpClass,
   inputClass,
   labelClass,
-  linkButtonClass,
 } from './ui'
-import { EMPTY_PLUGIN, searchPlugin } from '@/helper/plugins'
+import { EMPTY_PLUGIN, pluginToJson, searchPlugin } from '@/helper/plugins'
 import { compilePattern } from '@/utils/playlist'
 
 const JSON_EXAMPLE = `{
@@ -84,17 +84,51 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
     onSave({ ...draft, name: draft.name.trim() })
   }
 
+  const readJson = () => {
+    let parsed
+    try {
+      parsed = JSON.parse(json)
+    } catch {
+      throw new Error('That is not valid JSON.')
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Expected a single source object.')
+    }
+    if (!String(parsed.name ?? '').trim()) throw new Error('Give the source a "name".')
+    return { ...structuredClone(EMPTY_PLUGIN), ...parsed, name: String(parsed.name).trim() }
+  }
+
   const handleJsonSubmit = (event) => {
     event.preventDefault()
     try {
-      const parsed = JSON.parse(json)
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('Expected a single source object.')
-      }
-      if (!String(parsed.name ?? '').trim()) throw new Error('Give the source a "name".')
-      onSave({ ...structuredClone(EMPTY_PLUGIN), ...parsed, name: String(parsed.name).trim() })
+      onSave(readJson())
     } catch (jsonError) {
-      setError(jsonError instanceof SyntaxError ? 'That is not valid JSON.' : jsonError.message)
+      setError(jsonError.message)
+    }
+  }
+
+  /**
+   * The two views edit the same source, so each hands its state to the other
+   * rather than discarding it — see the same pairing in `MovieFields`.
+   */
+  const toggleJson = () => {
+    setError('')
+
+    if (json === null) {
+      setJson(plugin ? pluginToJson(draft) : '')
+      return
+    }
+
+    if (!json.trim()) {
+      setJson(null)
+      return
+    }
+
+    try {
+      setDraft(readJson())
+      setJson(null)
+    } catch (jsonError) {
+      setError(jsonError.message)
     }
   }
 
@@ -109,18 +143,26 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
     }
   }
 
+  const mode = json === null ? 'form' : 'json'
+  /** Both directions are the same hand-off, so re-picking the current mode is a no-op. */
+  const chooseMode = (next) => {
+    if (next !== mode) toggleJson()
+  }
+
+  const modeSwitch = (
+    <ModeSwitch
+      value={mode}
+      onChange={chooseMode}
+      label="Editing mode"
+      options={[
+        { value: 'form', label: 'Form' },
+        { value: 'json', label: 'JSON' },
+      ]}
+    />
+  )
+
   const actions = (
     <div className="flex items-center justify-end gap-2">
-      <button
-        type="button"
-        className={`${linkButtonClass} mr-auto`}
-        onClick={() => {
-          setError('')
-          setJson(json === null ? '' : null)
-        }}
-      >
-        {json === null ? 'Paste JSON instead' : 'Use the form instead'}
-      </button>
       <button type="button" onClick={onCancel} className={ghostButtonClass}>
         Cancel
       </button>
@@ -133,6 +175,8 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
   if (json !== null) {
     return (
       <form onSubmit={handleJsonSubmit} className="flex flex-col gap-4">
+        {modeSwitch}
+
         <div>
           <label className={labelClass} htmlFor="plugin-json">
             Source JSON
@@ -157,6 +201,8 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {modeSwitch}
+
       <div>
         <label className={labelClass} htmlFor="plugin-name">
           Name
