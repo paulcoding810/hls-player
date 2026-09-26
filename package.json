@@ -23,8 +23,8 @@
   "scripts": {
     "dev": "vite",
     "dev:firefox": "BROWSER=firefox NODE_ENV=development vite build --mode development --minify false",
-    "test": "node --import ./test/register.mjs --test test/",
-    "test:watch": "node --import ./test/register.mjs --test --watch test/",
+    "test": "node --import ./test/register.mjs --test test/*.test.js",
+    "test:watch": "node --import ./test/register.mjs --test --watch test/*.test.js",
     "lint": "eslint src test",
     "build": "vite build",
     "build:firefox": "BROWSER=firefox vite build",
