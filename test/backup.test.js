@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { stubStorage } from './helpers.mjs'
 import { applyBackup, buildBackup, readBackup } from '@/helper/backup'
-import { addMovie, EMPTY_MOVIE, getLibrary } from '@/helper/library'
+import { addMovie, EMPTY_MOVIE, getLibrary, resolveConfig } from '@/helper/library'
 import { addPlugin, getPlugins } from '@/helper/plugins'
 import { saveProgress } from '@/helper/progress'
 import { DEFAULT_SETTINGS, sanitizeSettings } from '@/helper/settings'
@@ -190,6 +190,33 @@ describe('sanitizeSettings', () => {
 
   it('defaults to full volume', () => {
     assert.equal(DEFAULT_SETTINGS.volume, 1)
+  })
+
+  it('keeps the subtitle settings inside their ranges', () => {
+    const read = (patch) => sanitizeSettings({ ...DEFAULT_SETTINGS, ...patch })
+
+    assert.equal(read({ subtitleSize: 1.5 }).subtitleSize, 1.5)
+    assert.equal(read({ subtitleSize: 99 }).subtitleSize, 2, 'clamped to the largest offered')
+    assert.equal(read({ subtitleSize: 0 }).subtitleSize, 0.75, 'clamped to the smallest')
+    assert.equal(read({ subtitleSize: 'huge' }).subtitleSize, 1)
+
+    assert.equal(read({ subtitleLang: '  EN-gb ' }).subtitleLang, 'en-gb', 'matched lowercase')
+    assert.equal(read({ subtitlesOn: 'yes' }).subtitlesOn, true)
+    assert.equal(
+      read({ subtitleBackground: undefined }).subtitleBackground,
+      true,
+      'the box stays unless it is turned off',
+    )
+    assert.equal(read({ subtitleBackground: false }).subtitleBackground, false)
+  })
+
+  it('keeps the subtitle settings out of the per-movie config', () => {
+    // `resolveConfig` is the set of fields a movie may override. Subtitles are
+    // global only, so the player reads them from the settings directly.
+    const config = resolveConfig(null, { ...DEFAULT_SETTINGS, subtitleSize: 1.25 })
+    for (const key of ['subtitlesOn', 'subtitleLang', 'subtitleSize', 'subtitleBackground']) {
+      assert.ok(!(key in config), `${key} should not be a per-movie field`)
+    }
   })
 
   it('coerces the rest to usable values', () => {

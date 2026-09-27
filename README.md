@@ -291,6 +291,23 @@ track on and off without going to the menu. The menu only appears when the strea
 track, and the list is watched rather than read once, since tracks arrive after the manifest is
 parsed and a rendition change can add or drop them.
 
+The options page carries four settings for them:
+
+| Setting                                  | Does                                                                                       |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Turn subtitles on when a stream has them | picks a track by itself, once per episode                                                  |
+| Preferred language                       | matched on the start of the track's language, so `en` finds `en-GB`; blank takes the first |
+| Size                                     | scales the cues from 0.75× to 2×                                                           |
+| Shaded box behind the text               | off replaces the box with an outline, for a lighter look over bright video                 |
+
+A track is chosen once per episode, so picking a different one from the menu is not undone
+mid-playback.
+
+**Size** and the **shaded box** are also reachable while watching, from the cog beside the
+subtitle menu in the control bar — they are the two worth changing against the video in front of
+you. They are the same global settings, so a change there shows on the options page and applies to
+every movie. The control bar stays up while that popover is open.
+
 Subtitles are lifted clear of the control bar by a fixed amount. video.js drops them almost to the
 bottom edge when its own skin is disabled, which is where our bar sits; lifting them only while the
 bar is visible would make them jump every time it faded.

@@ -1,4 +1,4 @@
-import { PLAYBACK_RATES } from '@/helper/constants'
+import { PLAYBACK_RATES, SUBTITLE_SIZES } from '@/helper/constants'
 import { checkboxClass, checkboxRowClass, helpClass, inputClass, labelClass } from './ui'
 
 /** Controlled by the parent, which owns persistence. */
@@ -138,6 +138,70 @@ export default function SettingsPanel({ settings, onChange }) {
         />
         Start muted (browsers block unmuted autoplay)
       </label>
+
+      <fieldset className="border-line mt-2 flex flex-col gap-3 rounded-md border p-3">
+        <legend className="text-ink-muted px-1 text-[11px] font-medium tracking-wider uppercase">
+          Subtitles
+        </legend>
+
+        <label className={checkboxRowClass}>
+          <input
+            type="checkbox"
+            className={checkboxClass}
+            checked={settings.subtitlesOn}
+            onChange={(event) => onChange({ subtitlesOn: event.target.checked })}
+          />
+          Turn subtitles on when a stream has them
+        </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass} htmlFor="subtitle-lang">
+              Preferred language
+            </label>
+            <input
+              id="subtitle-lang"
+              className={inputClass}
+              spellCheck="false"
+              placeholder="en"
+              value={settings.subtitleLang}
+              onChange={(event) => onChange({ subtitleLang: event.target.value })}
+            />
+            <p className={helpClass}>
+              Matched on the start of the track&apos;s language, so <code>en</code> finds{' '}
+              <code>en-GB</code>. Blank picks the first track.
+            </p>
+          </div>
+
+          <div>
+            <label className={labelClass} htmlFor="subtitle-size">
+              Size
+            </label>
+            <select
+              id="subtitle-size"
+              className={inputClass}
+              value={settings.subtitleSize}
+              onChange={(event) => onChange({ subtitleSize: Number(event.target.value) })}
+            >
+              {SUBTITLE_SIZES.map((size) => (
+                <option key={size.value} value={size.value}>
+                  {size.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <label className={checkboxRowClass}>
+          <input
+            type="checkbox"
+            className={checkboxClass}
+            checked={settings.subtitleBackground}
+            onChange={(event) => onChange({ subtitleBackground: event.target.checked })}
+          />
+          Shaded box behind the text
+        </label>
+      </fieldset>
     </div>
   )
 }

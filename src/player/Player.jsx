@@ -120,8 +120,10 @@ export default function Player() {
   const playerRef = useRef(null)
   /** Movie config merged over the global settings, for the video callbacks. */
   const configRef = useRef(resolveConfig(null, DEFAULT_SETTINGS))
-  /** Blob URLs behind the loaded subtitle tracks, revoked when the source changes. */
-  const subtitleUrls = useRef([])
+  /** Whether a track has been turned on for this source already. */
+  const chosenTrackRef = useRef(false)
+  /** The tracks this page added and their blobs, dropped when the source changes. */
+  const ourSubtitles = useRef([])
   /** Last compiled ad pattern, so a playlist request does not recompile it. */
   const patternRef = useRef({ source: '', regexp: null })
   /** What the last rewritten playlist cost, shown under the pattern field. */
@@ -177,7 +179,10 @@ export default function Player() {
     [episode],
   )
   // Inputs keep their raw text; playback reads sanitized numbers.
-  const config = resolveConfig(movie, sanitizeSettings(settings))
+  // Subtitles are global only — they are read from here rather than through
+  // `resolveConfig`, which is for the fields a movie may override.
+  const globals = sanitizeSettings(settings)
+  const config = resolveConfig(movie, globals)
 
   useEffect(() => {
     configRef.current = config
@@ -412,15 +417,18 @@ export default function Player() {
     return () => document.removeEventListener('fullscreenchange', listener)
   }, [])
 
-  /** Drops the tracks added for the previous episode and frees their blobs. */
+  /**
+   * Drops the tracks added for the previous episode and frees their blobs.
+   * Only the ones added here: VHS registers a stream's own subtitle tracks
+   * through `addRemoteTextTrack` too, so clearing the whole list would take
+   * the stream's with it.
+   */
   const clearSubtitles = useCallback((instance) => {
-    const tracks = instance?.remoteTextTracks?.()
-    // Backwards: removing shortens the list being walked.
-    for (let index = (tracks?.length ?? 0) - 1; index >= 0; index -= 1) {
-      instance.removeRemoteTextTrack(tracks[index])
-    }
-    subtitleUrls.current.forEach((url) => URL.revokeObjectURL(url))
-    subtitleUrls.current = []
+    ourSubtitles.current.forEach(({ element, url }) => {
+      instance?.removeRemoteTextTrack?.(element?.track ?? element)
+      URL.revokeObjectURL(url)
+    })
+    ourSubtitles.current = []
   }, [])
 
   /**
@@ -444,12 +452,12 @@ export default function Player() {
             if (playerRef.current !== instance) return
 
             const url = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
-            subtitleUrls.current.push(url)
-            instance.addRemoteTextTrack(
+            const element = instance.addRemoteTextTrack(
               { src: url, kind: 'subtitles', label: entry.label, srclang: entry.lang || 'und' },
               // Not manual: video.js should clean the track up with the player.
               false,
             )
+            ourSubtitles.current.push({ element, url })
           } catch (error) {
             // One bad file must not cost the others, or the video.
             console.warn(`[hls-player] subtitles ${entry.src} ${error.message}`)
@@ -469,6 +477,7 @@ export default function Player() {
       srcRef.current = source.src
       savedAtRef.current = 0
       skippedRef.current = false
+      chosenTrackRef.current = false
       durationRef.current = 0
       holdRef.current = false
       setResume(null)
@@ -673,6 +682,66 @@ export default function Player() {
     }
   }, [player, rememberVolume])
 
+  /**
+   * Turns a track on once per source when the setting asks for it. Tracks
+   * arrive after the manifest is parsed, and subtitle files later still, so
+   * this waits for them rather than reading the list once.
+   */
+  useEffect(() => {
+    if (!player || !globals.subtitlesOn) return undefined
+    const list = player.textTracks()
+    let timer
+
+    const choose = () => {
+      if (chosenTrackRef.current) return
+
+      const tracks = []
+      for (let index = 0; index < list.length; index += 1) {
+        const track = list[index]
+        if (track.kind === 'subtitles' || track.kind === 'captions') tracks.push(track)
+      }
+      if (!tracks.length) return
+
+      // A stream that marks a track DEFAULT has already chosen; leave it be.
+      if (tracks.some((track) => track.mode === 'showing')) {
+        chosenTrackRef.current = true
+        return
+      }
+
+      const wanted = globals.subtitleLang
+      const pick =
+        (wanted && tracks.find((t) => (t.language || '').toLowerCase().startsWith(wanted))) ||
+        tracks[0]
+
+      tracks.forEach((track) => {
+        track.mode = track === pick ? 'showing' : 'disabled'
+      })
+      chosenTrackRef.current = true
+    }
+
+    /**
+     * Deferred, because VHS attaches its own `change` listener *after* adding
+     * the tracks: a mode set inside the `addtrack` handler lands before it is
+     * listening, so the track reads as showing while its cues are never
+     * fetched — subtitles on and nothing on screen.
+     */
+    const soon = () => {
+      clearTimeout(timer)
+      timer = setTimeout(choose, 0)
+    }
+
+    list.addEventListener('addtrack', soon)
+    // A backstop for a track that was present before this effect ran.
+    player.on('loadedmetadata', soon)
+    soon()
+
+    return () => {
+      clearTimeout(timer)
+      list.removeEventListener('addtrack', soon)
+      player.off('loadedmetadata', soon)
+    }
+  }, [player, globals.subtitlesOn, globals.subtitleLang, source?.id])
+
   /** The rate is remembered globally, so it outlives this episode. */
   const setRate = useCallback(
     (playbackRate) => {
@@ -829,7 +898,12 @@ export default function Player() {
 
   return (
     <>
-      <main className="player-shell bg-surface text-ink flex h-screen flex-col">
+      <main
+        className={`player-shell bg-surface text-ink flex h-screen flex-col ${
+          globals.subtitleBackground ? '' : 'subtitles-bare'
+        }`}
+        style={{ '--subtitle-scale': globals.subtitleSize }}
+      >
         <header className="border-line flex items-center gap-3 border-b px-4 py-2">
           <button
             type="button"
@@ -971,7 +1045,9 @@ export default function Player() {
                   onNext={() => goToEpisode(movie.episodes[episodeIndex + 1].id)}
                   hasPrevious={hasPrevious}
                   hasNext={hasNext}
-                  onSeekingChange={setSeeking}
+                  onHoldControls={setSeeking}
+                  subtitleSettings={globals}
+                  onSubtitleSettings={updateSettings}
                   fullscreen={fullscreen}
                   onToggleFullscreen={toggleFullscreen}
                 />

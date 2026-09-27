@@ -14,6 +14,14 @@ export const DEFAULT_SETTINGS = {
   muted: false,
   /** Where the volume slider was left, 0-1. */
   volume: 1,
+  /** Turn a subtitle track on by itself when the stream carries one. */
+  subtitlesOn: false,
+  /** Preferred track language, matched on the prefix so `en` finds `en-GB`. */
+  subtitleLang: '',
+  /** Cue scale, 0.75-2. */
+  subtitleSize: 1,
+  /** The shaded box behind the cue text. */
+  subtitleBackground: true,
   playbackRate: 1,
   /** Skip the windows below without asking; off turns them into buttons. */
   autoSkip: true,
@@ -23,10 +31,10 @@ export const DEFAULT_SETTINGS = {
   skipTrailing: 0,
 }
 
-/** A stored volume outside 0-1 would mute the player or make `volume()` throw. */
-function clamp(value) {
-  const volume = Number(value)
-  return Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 1
+/** A stored value outside its range would mute the player or make `volume()` throw. */
+function clamp(value, low = 0, high = 1, fallback = 1) {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.min(high, Math.max(low, number)) : fallback
 }
 
 function toSeconds(value) {
@@ -45,6 +53,10 @@ export function sanitizeSettings(settings) {
     autoplay: Boolean(settings.autoplay),
     muted: Boolean(settings.muted),
     volume: clamp(settings.volume),
+    subtitlesOn: Boolean(settings.subtitlesOn),
+    subtitleLang: (settings.subtitleLang ?? '').trim().toLowerCase(),
+    subtitleSize: clamp(settings.subtitleSize, 0.75, 2, 1),
+    subtitleBackground: settings.subtitleBackground !== false,
     autoSkip: Boolean(settings.autoSkip),
     grabLinks: Boolean(settings.grabLinks),
     playbackRate: Number(settings.playbackRate) > 0 ? Number(settings.playbackRate) : 1,

@@ -13,6 +13,15 @@ export const SORT_ORDERS = [
   { value: 'title', label: 'Title' },
 ]
 
+/** Cue scales offered wherever subtitle size is set. */
+export const SUBTITLE_SIZES = [
+  { value: 0.75, label: 'Small' },
+  { value: 1, label: 'Normal' },
+  { value: 1.25, label: 'Large' },
+  { value: 1.5, label: 'Larger' },
+  { value: 2, label: 'Largest' },
+]
+
 export const PLAYER_PATH = 'player.html'
 
 export const GALLERY_PATH = 'gallery.html'

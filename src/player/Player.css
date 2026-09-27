@@ -20,3 +20,22 @@
   border-color: var(--color-primary);
   border-top-color: var(--color-line-strong);
 }
+
+/*
+  Cue size and the shaded box are ours rather than video.js's TextTrackSettings:
+  that writes through a modal's <select> elements, which ModalDialog only builds
+  when opened. `!important` is needed because vtt.js sizes and paints each cue
+  with inline styles.
+*/
+.player-shell .vjs-text-track-cue {
+  transform: scale(var(--subtitle-scale, 1));
+  transform-origin: center bottom;
+}
+
+.player-shell.subtitles-bare .vjs-text-track-cue > div {
+  background-color: transparent !important;
+  text-shadow:
+    0 0 4px #000,
+    0 0 4px #000,
+    0 0 4px #000;
+}

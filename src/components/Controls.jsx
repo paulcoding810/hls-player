@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
   FullscreenExitIcon,
+  SettingsIcon,
   FullscreenIcon,
   NextIcon,
   PauseIcon,
@@ -10,8 +11,8 @@ import {
   VolumeIcon,
   VolumeMutedIcon,
 } from './icons'
-import { iconButtonClass, selectClass } from './ui'
-import { PLAYBACK_RATES } from '@/helper/constants'
+import { checkboxClass, checkboxRowClass, iconButtonClass, labelClass, selectClass } from './ui'
+import { PLAYBACK_RATES, SUBTITLE_SIZES } from '@/helper/constants'
 import { formatTime } from '@/utils/time'
 import './Controls.css'
 
@@ -72,7 +73,9 @@ export default function Controls({
   onRateChange,
   onPrevious,
   onNext,
-  onSeekingChange,
+  onHoldControls,
+  subtitleSettings,
+  onSubtitleSettings,
   hasPrevious,
   hasNext,
   fullscreen,
@@ -88,6 +91,7 @@ export default function Controls({
   const [hover, setHover] = useState(null)
   /** Subtitle and caption tracks the stream carries, and which is showing. */
   const [tracks, setTracks] = useState([])
+  const [tuning, setTuning] = useState(false)
 
   useEffect(() => {
     if (!player) return
@@ -139,7 +143,7 @@ export default function Controls({
 
   const startSeek = () => {
     pendingSeek.current = state.currentTime
-    onSeekingChange?.(true)
+    onHoldControls?.(true)
   }
 
   const moveSeek = (event) => {
@@ -159,7 +163,7 @@ export default function Controls({
     // then would render the pre-seek time and snap the thumb backwards.
     setState((current) => ({ ...current, currentTime: target }))
     setScrubbing(null)
-    onSeekingChange?.(false)
+    onHoldControls?.(false)
   }
 
   // The thumb's centre only spans `width - THUMB_SIZE`, inset by half of it at
@@ -188,7 +192,7 @@ export default function Controls({
   const cancelSeek = () => {
     pendingSeek.current = null
     setScrubbing(null)
-    onSeekingChange?.(false)
+    onHoldControls?.(false)
   }
 
   return (
@@ -305,20 +309,78 @@ export default function Controls({
           </select>
 
           {tracks.length > 0 && (
-            <select
-              value={showing?.id ?? 'off'}
-              onChange={(event) => chooseTrack(event.target.value)}
-              aria-label="Subtitles"
-              title="Subtitles (c)"
-              className={selectClass}
-            >
-              <option value="off">Subtitles off</option>
-              {tracks.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
+            <div className="relative flex items-center gap-1">
+              {tuning && (
+                <div className="border-line bg-panel/95 absolute right-0 bottom-full mb-2 flex w-56 flex-col gap-3 rounded-md border p-3 backdrop-blur-sm">
+                  <div>
+                    <label className={labelClass} htmlFor="subtitle-scale">
+                      Subtitle size
+                    </label>
+                    <select
+                      id="subtitle-scale"
+                      className={selectClass}
+                      value={subtitleSettings?.subtitleSize ?? 1}
+                      onChange={(event) =>
+                        onSubtitleSettings?.({ subtitleSize: Number(event.target.value) })
+                      }
+                    >
+                      {SUBTITLE_SIZES.map((size) => (
+                        <option key={size.value} value={size.value}>
+                          {size.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <label className={checkboxRowClass}>
+                    <input
+                      type="checkbox"
+                      className={checkboxClass}
+                      checked={subtitleSettings?.subtitleBackground ?? true}
+                      onChange={(event) =>
+                        onSubtitleSettings?.({ subtitleBackground: event.target.checked })
+                      }
+                    />
+                    Shaded box
+                  </label>
+
+                  <p className="text-ink-faint text-xs">
+                    Applies to every movie; the options page has the rest.
+                  </p>
+                </div>
+              )}
+
+              <select
+                value={showing?.id ?? 'off'}
+                onChange={(event) => chooseTrack(event.target.value)}
+                aria-label="Subtitles"
+                title="Subtitles (c)"
+                className={selectClass}
+              >
+                <option value="off">Subtitles off</option>
+                {tracks.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !tuning
+                  setTuning(next)
+                  // The bar fades on idle; an open popover must outlast that.
+                  onHoldControls?.(next)
+                }}
+                className={`${iconButtonClass} ${tuning ? 'text-primary' : ''}`}
+                aria-label="Subtitle appearance"
+                aria-expanded={tuning}
+                title="Subtitle appearance"
+              >
+                <SettingsIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
           )}
 
           {levels.length > 1 && (
