@@ -83,6 +83,9 @@ const VIDEO_JS_OPTIONS = {
 /** Segment bodies worth unwrapping — never `segment-key`, which is 16 bytes. */
 const SEGMENT_TYPES = new Set(['segment', 'segment-media-initialization'])
 
+/** Dragging the slider fires `volumechange` continuously; only the rest is kept. */
+const VOLUME_SETTLE = 400
+
 /** Seconds of grace before an auto-skipped outro moves on, long enough to stop it. */
 const OUTRO_COUNTDOWN = 5
 
@@ -488,10 +491,11 @@ export default function Player() {
       const stored = await getProgress(source.src)
       if (cancelled) return
 
-      const { autoplay, muted, playbackRate } = configRef.current
+      const { autoplay, muted, playbackRate, volume } = configRef.current
       holdRef.current = Boolean(stored)
       instance.src({ src: source.src, type: manifestMime(source.src) })
       loadSubtitles(instance, source.subtitles)
+      instance.volume(volume)
       instance.muted(Boolean(muted))
       instance.playbackRate(playbackRate)
 
@@ -635,6 +639,39 @@ export default function Player() {
       return next
     })
   }, [])
+
+  /**
+   * The slider, the mute button and the keyboard all end at `volumechange`, so
+   * that one event is where the level is remembered rather than three call
+   * sites. Returning `previous` unchanged skips both the render and the write,
+   * which is what stops loading an episode from saving the values it just
+   * applied.
+   */
+  const rememberVolume = useCallback((volume, muted) => {
+    setSettings((previous) => {
+      if (previous.volume === volume && previous.muted === muted) return previous
+      const next = { ...previous, volume, muted }
+      saveSettings(next)
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!player) return undefined
+    let timer
+
+    // Dragging fires this continuously, so only where it settles is kept.
+    const persist = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => rememberVolume(player.volume(), player.muted()), VOLUME_SETTLE)
+    }
+
+    player.on('volumechange', persist)
+    return () => {
+      clearTimeout(timer)
+      player.off('volumechange', persist)
+    }
+  }, [player, rememberVolume])
 
   /** The rate is remembered globally, so it outlives this episode. */
   const setRate = useCallback(

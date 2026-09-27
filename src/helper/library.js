@@ -311,5 +311,6 @@ export function resolveConfig(movie, settings) {
     playbackRate: settings.playbackRate,
     autoplay: settings.autoplay,
     muted: settings.muted,
+    volume: settings.volume,
   }
 }

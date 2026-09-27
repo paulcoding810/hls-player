@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS = {
   gallerySort: 'watched',
   autoplay: true,
   muted: false,
+  /** Where the volume slider was left, 0-1. */
+  volume: 1,
   playbackRate: 1,
   /** Skip the windows below without asking; off turns them into buttons. */
   autoSkip: true,
@@ -19,6 +21,12 @@ export const DEFAULT_SETTINGS = {
   skipLeading: 0,
   /** Seconds before the end at which the next item starts (credits). */
   skipTrailing: 0,
+}
+
+/** A stored volume outside 0-1 would mute the player or make `volume()` throw. */
+function clamp(value) {
+  const volume = Number(value)
+  return Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 1
 }
 
 function toSeconds(value) {
@@ -36,6 +44,7 @@ export function sanitizeSettings(settings) {
     adPattern: (settings.adPattern ?? '').trim(),
     autoplay: Boolean(settings.autoplay),
     muted: Boolean(settings.muted),
+    volume: clamp(settings.volume),
     autoSkip: Boolean(settings.autoSkip),
     grabLinks: Boolean(settings.grabLinks),
     playbackRate: Number(settings.playbackRate) > 0 ? Number(settings.playbackRate) : 1,

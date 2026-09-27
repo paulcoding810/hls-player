@@ -176,6 +176,22 @@ describe('sanitizeSettings', () => {
     )
   })
 
+  it('clamps a stored volume into range', () => {
+    // `player.volume()` throws outside 0-1, so a hand-edited or corrupt value
+    // must not reach it.
+    const volume = (value) => sanitizeSettings({ ...DEFAULT_SETTINGS, volume: value }).volume
+    assert.equal(volume(0.4), 0.4)
+    assert.equal(volume(0), 0, 'silence is a real choice, not a missing value')
+    assert.equal(volume(5), 1)
+    assert.equal(volume(-1), 0)
+    assert.equal(volume('nonsense'), 1)
+    assert.equal(volume(undefined), 1)
+  })
+
+  it('defaults to full volume', () => {
+    assert.equal(DEFAULT_SETTINGS.volume, 1)
+  })
+
   it('coerces the rest to usable values', () => {
     const clean = sanitizeSettings({
       ...DEFAULT_SETTINGS,

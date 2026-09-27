@@ -280,6 +280,9 @@ on the first move.
 
 Clicking the video toggles playback, double-clicking toggles fullscreen.
 
+The volume and whether you muted are remembered and applied to the next episode and the next
+session — however you changed them, slider, mute button or keyboard.
+
 ### Subtitles
 
 A stream that carries subtitle or caption tracks — an HLS `SUBTITLES` group, or in-band 608/708
