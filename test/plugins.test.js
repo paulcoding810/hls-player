@@ -142,6 +142,40 @@ describe('fetchEpisodes', () => {
     assert.equal((await fetchEpisodes(PLUGIN, { id: '1' })).length, 0)
   })
 
+  it('reshapes a URL through a filter', async () => {
+    const filtered = {
+      ...PLUGIN,
+      details: {
+        ...PLUGIN.details,
+        fields: { title: 'name', src: '{url|replace:video,stream}/master.m3u8' },
+      },
+    }
+    stubFetch(async () =>
+      jsonReply({
+        data: { play: [{ list: [{ name: 'Ep 1', url: 'https://cdn.test/video/abc' }] }] },
+      }),
+    )
+
+    const [episode] = await fetchEpisodes(filtered, { id: '1' })
+    assert.equal(episode.src, 'https://cdn.test/stream/abc/master.m3u8')
+  })
+
+  it('drops the episode when a filter is misspelled', async () => {
+    // Left as a literal, `https://cdn.test/{url|replce:a,b}` is a URL `new URL`
+    // accepts, so it would otherwise be stored and fail only at playback.
+    const broken = {
+      ...PLUGIN,
+      details: { ...PLUGIN.details, fields: { title: 'name', src: '{url|replce:video,stream}' } },
+    }
+    stubFetch(async () =>
+      jsonReply({
+        data: { play: [{ list: [{ name: 'Ep 1', url: 'https://cdn.test/video/abc' }] }] },
+      }),
+    )
+
+    assert.equal((await fetchEpisodes(broken, { id: '1' })).length, 0)
+  })
+
   it('reads subtitles when the source names them', async () => {
     stubFetch(async () =>
       jsonReply({

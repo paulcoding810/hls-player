@@ -186,6 +186,21 @@ build below. Instead you say _where_ the values are:
   rather than half-built.
 - A field is treated as a template if it contains `{`, and as a path otherwise — so `src` can be
   either `url` (a path to a ready-made URL) or the template above.
+- **Filters** reshape a value on the way in, for when a source returns something close to the URL
+  you need rather than it: `{url|replace:video,stream}/master.m3u8`. They chain, and work in any
+  templated field.
+
+| Filter            | Does                                                             |
+| ----------------- | ---------------------------------------------------------------- |
+| `replace:from,to` | swaps `from` for `to` — **every** occurrence, not just the first |
+| `lower` / `upper` | changes case                                                     |
+| `trim`            | drops surrounding whitespace                                     |
+| `encode`          | percent-encodes, for a value going into a query string           |
+
+`|` separates the filters, the first `:` separates a filter from its argument, and the first `,`
+separates `from` from `to` — so both may themselves contain `:` and `,`, as URLs do. An empty `to`
+removes (`{id|replace:vod-,}`). A misspelled filter leaves the placeholder in place, which makes
+the field unusable and drops it, rather than storing a URL built around the literal text.
 
 `referer` and `adPattern` describe the site rather than its API, so they are handed to every movie
 added from the source and take effect during playback — see

@@ -27,7 +27,7 @@ const JSON_EXAMPLE = `{
     "episodes": "data.play[0].list",
     "fields": {
       "title": "name",
-      "src": "https://cdn.example.com/{path}.m3u8",
+      "src": "{url|replace:video,stream}/master.m3u8",
       "subtitles": "subs"
     }
   }
@@ -328,7 +328,7 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
             id="plugin-details-src"
             label="Episode URL"
             placeholder="url"
-            help="A path, or a template using {…} fields."
+            help="A path, or a template. A value can be reshaped: {url|replace:a,b}"
             value={draft.details.fields.src}
             onChange={(src) => fields('details', { src })}
           />

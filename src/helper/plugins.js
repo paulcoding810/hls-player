@@ -120,7 +120,7 @@ function valueOf(entry, path) {
   // A placeholder still standing means the entry had nothing for it. Returning
   // the half-built string would be worse than nothing: `new URL` accepts
   // `https://host/{path}.m3u8`, so it would pass for a real episode URL.
-  return /\{\w+\}/.test(filled) ? '' : filled
+  return /\{[^{}]+\}/.test(filled) ? '' : filled
 }
 
 function extract(entry, fields) {

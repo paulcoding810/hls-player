@@ -27,7 +27,8 @@ positions live in a separate store (`src/helper/progress.js`) keyed by episode U
 episode has its entry dropped rather than kept, so `movie.watchedAt` — set by `markWatched()`,
 cleared by `setLastPlayed()` — is what tells a watched movie from one never opened. Source plugins live in a
 fourth store (`src/helper/plugins.js`): each one describes a site's JSON API as two URL templates
-plus paths, read by `readPath`/`fillTemplate` in `src/utils/jsonPath.js`. A plugin can never hold
+plus paths, read by `readPath`/`fillTemplate` in `src/utils/jsonPath.js` — whose `|` filters are
+the only way a source can reshape a value, since it cannot ship code to do it. A plugin can never hold
 code — MV3 forbids `eval`, so extraction is data; do not "simplify" it into a callback. A plugin also carries the
 site's `referer` and `adPattern`, copied onto each movie it adds rather than looked up later. A movie
 added from one carries `source: { pluginId, itemId }`, which is what the gallery's refresh button
