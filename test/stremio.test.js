@@ -182,6 +182,67 @@ describe('resolveStream', () => {
     assert.equal((await resolveStream(ADDON, stream)).referer, 'https://ref.test/')
   })
 
+  it('carries the subtitles the stream ships with', async () => {
+    serve({
+      stream: {
+        streams: [
+          {
+            url: 'https://cdn.test/a.m3u8',
+            subtitles: [
+              { id: '1', url: 'https://subs.test/en.srt', lang: 'eng' },
+              { id: '2', url: 'https://subs.test/es.vtt', lang: 'spa' },
+            ],
+          },
+        ],
+      },
+    })
+
+    const { subtitles } = await resolveStream(ADDON, stream)
+    assert.equal(subtitles.length, 2)
+    assert.equal(subtitles[0].src, 'https://subs.test/en.srt')
+    assert.equal(subtitles[0].label, 'eng', 'the language is what the menu shows')
+    assert.equal(subtitles[0].lang, 'eng')
+  })
+
+  it('falls back to the subtitle id when it has no language', async () => {
+    serve({
+      stream: {
+        streams: [
+          {
+            url: 'https://cdn.test/a.m3u8',
+            subtitles: [{ id: 'sub-7', url: 'https://subs.test/a.srt' }],
+          },
+        ],
+      },
+    })
+    assert.equal((await resolveStream(ADDON, stream)).subtitles[0].label, 'sub-7')
+  })
+
+  it('drops a subtitle with no usable URL, keeping the rest', async () => {
+    serve({
+      stream: {
+        streams: [
+          {
+            url: 'https://cdn.test/a.m3u8',
+            subtitles: [
+              { id: '1', lang: 'eng' },
+              { id: '2', url: 'not a url', lang: 'spa' },
+              { id: '3', url: 'https://subs.test/fr.srt', lang: 'fra' },
+            ],
+          },
+        ],
+      },
+    })
+    const { subtitles } = await resolveStream(ADDON, stream)
+    assert.equal(subtitles.length, 1)
+    assert.equal(subtitles[0].lang, 'fra')
+  })
+
+  it('is an empty list when the stream ships none', async () => {
+    serve({ stream: { streams: [{ url: 'https://cdn.test/a.m3u8' }] } })
+    assert.deepEqual((await resolveStream(ADDON, stream)).subtitles, [])
+  })
+
   it('says so when every stream needs another app', async () => {
     serve({ stream: { streams: [{ infoHash: 'abc' }, { infoHash: 'def' }] } })
     await assert.rejects(() => resolveStream(ADDON, stream), /torrents and external links/)

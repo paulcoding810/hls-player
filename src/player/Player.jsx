@@ -502,6 +502,9 @@ export default function Player() {
       // the addon may supply the `Referer` its stream wants.
       let playUrl = source.src
       let referer = configRef.current.referer
+      // An addon may ship subtitles with the stream; the episode's own are
+      // whatever was stored when it was added.
+      let subtitles = source.subtitles ?? []
 
       if (source.stream) {
         setResolving(true)
@@ -513,6 +516,7 @@ export default function Player() {
           const found = await resolveStream(plugin, source.stream)
           playUrl = found.url
           referer = found.referer || referer
+          subtitles = [...subtitles, ...found.subtitles]
         } catch (streamError) {
           if (!cancelled) setError(streamError.message)
           return
@@ -539,7 +543,7 @@ export default function Player() {
       const { autoplay, muted, playbackRate, volume } = configRef.current
       holdRef.current = Boolean(stored)
       instance.src({ src: playUrl, type: manifestMime(playUrl) })
-      loadSubtitles(instance, source.subtitles)
+      loadSubtitles(instance, subtitles)
       instance.volume(volume)
       instance.muted(Boolean(muted))
       instance.playbackRate(playbackRate)

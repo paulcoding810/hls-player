@@ -168,7 +168,9 @@ unaffected — their URL is still the key, and every position already stored sti
 
 The first stream the addon offers that this player can open is the one that plays. If it marks a
 stream with `proxyHeaders`, the `Referer` there is applied through the same header override the
-rest of the app uses. A source's own **Referer** and **ad segment pattern** are copied onto every
+rest of the app uses, and any subtitles it ships with join the control bar's subtitle menu, labelled
+by language. Those are fetched and converted like any other subtitle file, so SRT works and a host
+that sends no CORS headers is not a problem. A source's own **Referer** and **ad segment pattern** are copied onto every
 movie it adds, as playback settings.
 
 **Test** on the source form runs a real search against the addon, which is the only way to know it

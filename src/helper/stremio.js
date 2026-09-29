@@ -1,3 +1,4 @@
+import { readSubtitles } from '@/utils/subtitles'
 import { normalizeSource } from '@/utils/url'
 
 /**
@@ -149,8 +150,26 @@ function playable(stream) {
 }
 
 /**
- * The first playable stream for one video. `proxyHeaders` is how an addon says
- * the stream wants a `Referer`, which is exactly what the header override does.
+ * Stremio subtitles are `{ id, url, lang }`; ours want a label, and the language
+ * is the only thing worth showing in the menu.
+ */
+function subtitlesOf(stream) {
+  const list = Array.isArray(stream?.subtitles) ? stream.subtitles : []
+
+  return readSubtitles(
+    list.map((entry) => ({
+      src: entry?.url,
+      label: entry?.lang || entry?.id || '',
+      lang: entry?.lang || '',
+    })),
+    normalizeSource,
+  )
+}
+
+/**
+ * The first playable stream for one video, with whatever it carries.
+ * `proxyHeaders` is how an addon says the stream wants a `Referer`, which is
+ * exactly what the header override does.
  */
 export async function resolveStream(plugin, stream) {
   const base = baseOf(plugin)
@@ -174,5 +193,10 @@ export async function resolveStream(plugin, stream) {
   const headers = found.behaviorHints?.proxyHeaders?.request ?? {}
   const referer = headers.Referer ?? headers.referer ?? ''
 
-  return { url: normalizeSource(found.url), referer, name: found.name || found.title || '' }
+  return {
+    url: normalizeSource(found.url),
+    referer,
+    name: found.name || found.title || '',
+    subtitles: subtitlesOf(found),
+  }
 }
