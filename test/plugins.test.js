@@ -4,188 +4,64 @@ import assert from 'node:assert/strict'
 import { jsonReply, stubFetch, stubStorage } from './helpers.mjs'
 import { addMovie, getLibrary } from '@/helper/library'
 import {
+  addPlugin,
   EMPTY_PLUGIN,
-  fetchEpisodes,
-  loadMore,
+  getPlugins,
   pluginToJson,
   refreshMovie,
+  savePlugins,
   searchAll,
-  searchPlugin,
 } from '@/helper/plugins'
 
-const PLUGIN = {
+const ADDON = {
   id: 'p1',
-  name: 'Example',
+  name: 'Addon',
   enabled: true,
-  referer: 'https://ex.test/',
+  kind: 'stremio',
+  url: 'https://addon.test/manifest.json',
+  referer: 'https://ref.test/',
   adPattern: '^/ads/.+\\.ts$',
-  search: {
-    url: 'https://api.test/s?q={query}&page={page}',
-    list: 'data.items',
-    fields: { id: 'vod_id', title: 'vod_name', poster: 'img.cover' },
-  },
-  details: {
-    url: 'https://api.test/d/{id}',
-    episodes: 'data.play[0].list',
-    fields: { title: 'name', src: 'https://cdn.test/{path}.m3u8', subtitles: 'subs' },
-  },
+}
+
+const MANIFEST = {
+  name: 'Addon',
+  resources: ['catalog', 'meta', 'stream'],
+  types: ['series'],
+  catalogs: [{ type: 'series', id: 'top', name: 'Top', extra: [{ name: 'search' }] }],
 }
 
 beforeEach(() => stubStorage())
 
-describe('searchPlugin', () => {
-  it('fills the query into the URL and reads the named fields', async () => {
-    let asked = ''
-    stubFetch(async (url) => {
-      asked = url
-      return jsonReply({
-        data: { items: [{ vod_id: 42, vod_name: 'Godzilla', img: { cover: 'c.jpg' } }] },
-      })
-    })
+describe('the source store', () => {
+  it('drops a source described by hand-written paths', async () => {
+    // Nothing reads those any more, so they are cleared out once.
+    await savePlugins([
+      { id: 'old', name: 'My API', enabled: true, search: { url: 'https://a/?q={query}' } },
+      ADDON,
+    ])
 
-    const [result] = await searchPlugin(PLUGIN, 'god zilla')
-    assert.equal(asked, 'https://api.test/s?q=god%20zilla&page=1')
-    assert.deepEqual([result.id, result.title, result.poster], ['42', 'Godzilla', 'c.jpg'])
-    assert.equal(result.plugin.id, 'p1')
-  })
-
-  it('drops a half-formed result rather than showing one that cannot be fetched', async () => {
-    stubFetch(async () =>
-      jsonReply({
-        data: { items: [{ vod_id: 1, vod_name: 'Fine' }, { vod_id: 2 }, { vod_name: 'No id' }] },
-      }),
+    const kept = await getPlugins()
+    assert.deepEqual(
+      kept.map((plugin) => plugin.id),
+      ['p1'],
     )
-    assert.equal((await searchPlugin(PLUGIN, 'x')).length, 1)
   })
 
-  it('yields nothing, not a throw, when the list path matches nothing', async () => {
-    stubFetch(async () => jsonReply({ wrong: 'shape' }))
-    assert.equal((await searchPlugin(PLUGIN, 'x')).length, 0)
+  it('writes the shorter list back, so it is not re-decided every read', async () => {
+    const store = stubStorage()
+    await savePlugins([{ id: 'old', name: 'My API', enabled: true }, ADDON])
+    await getPlugins()
+    assert.equal(store.plugins.items.length, 1)
   })
 
-  describe('reports a failure in words the user can act on', () => {
-    const cases = {
-      'a bad status': [
-        async () => jsonReply({}, { ok: false, status: 404 }),
-        /Example answered 404/,
-      ],
-      'a body that is not JSON': [
-        async () => ({
-          ok: true,
-          status: 200,
-          json: async () => {
-            throw new SyntaxError('bad')
-          },
-        }),
-        /did not return JSON/,
-      ],
-      'a timeout': [
-        async () => {
-          const error = new Error('aborted')
-          error.name = 'AbortError'
-          throw error
-        },
-        /did not answer in time/,
-      ],
-      'a network error': [
-        async () => {
-          throw new TypeError('Failed to fetch')
-        },
-        /Failed to fetch/,
-      ],
-    }
-
-    for (const [name, [handler, message]] of Object.entries(cases)) {
-      it(name, async () => {
-        stubFetch(handler)
-        await assert.rejects(() => searchPlugin(PLUGIN, 'x'), message)
-      })
-    }
-
-    it('names the source exactly once', async () => {
-      stubFetch(async () => jsonReply({}, { ok: false, status: 404 }))
-      const error = await searchPlugin(PLUGIN, 'x').catch((e) => e)
-      assert.equal(error.message.match(/Example/g).length, 1)
-    })
-  })
-})
-
-describe('fetchEpisodes', () => {
-  it('builds each episode URL from the template', async () => {
-    let asked = ''
-    stubFetch(async (url) => {
-      asked = url
-      return jsonReply({
-        data: {
-          play: [
-            {
-              list: [
-                { name: 'Ep 1', path: 'x/1' },
-                { name: 'Ep 2', path: 'x/2' },
-              ],
-            },
-          ],
-        },
-      })
-    })
-
-    const episodes = await fetchEpisodes(PLUGIN, { id: '42' })
-    assert.equal(asked, 'https://api.test/d/42')
-    assert.equal(episodes[0].src, 'https://cdn.test/x/1.m3u8')
-    assert.equal(episodes.length, 2)
+  it('leaves a store of addons alone', async () => {
+    await savePlugins([ADDON])
+    assert.equal((await getPlugins()).length, 1)
   })
 
-  it('drops an entry whose template could not be filled', async () => {
-    // `new URL` accepts `https://cdn.test/{path}.m3u8`, so a half-built URL
-    // would otherwise pass for a real one.
-    stubFetch(async () => jsonReply({ data: { play: [{ list: [{ name: 'Bad', path: null }] }] } }))
-    assert.equal((await fetchEpisodes(PLUGIN, { id: '1' })).length, 0)
-  })
-
-  it('reshapes a URL through a filter', async () => {
-    const filtered = {
-      ...PLUGIN,
-      details: {
-        ...PLUGIN.details,
-        fields: { title: 'name', src: '{url|replace:video,stream}/master.m3u8' },
-      },
-    }
-    stubFetch(async () =>
-      jsonReply({
-        data: { play: [{ list: [{ name: 'Ep 1', url: 'https://cdn.test/video/abc' }] }] },
-      }),
-    )
-
-    const [episode] = await fetchEpisodes(filtered, { id: '1' })
-    assert.equal(episode.src, 'https://cdn.test/stream/abc/master.m3u8')
-  })
-
-  it('drops the episode when a filter is misspelled', async () => {
-    // Left as a literal, `https://cdn.test/{url|replce:a,b}` is a URL `new URL`
-    // accepts, so it would otherwise be stored and fail only at playback.
-    const broken = {
-      ...PLUGIN,
-      details: { ...PLUGIN.details, fields: { title: 'name', src: '{url|replce:video,stream}' } },
-    }
-    stubFetch(async () =>
-      jsonReply({
-        data: { play: [{ list: [{ name: 'Ep 1', url: 'https://cdn.test/video/abc' }] }] },
-      }),
-    )
-
-    assert.equal((await fetchEpisodes(broken, { id: '1' })).length, 0)
-  })
-
-  it('reads subtitles when the source names them', async () => {
-    stubFetch(async () =>
-      jsonReply({
-        data: {
-          play: [{ list: [{ name: 'Ep 1', path: 'x/1', subs: ['https://cdn.test/en.vtt'] }] }],
-        },
-      }),
-    )
-    const [episode] = await fetchEpisodes(PLUGIN, { id: '1' })
-    assert.equal(episode.subtitles.length, 1)
+  it('starts a new source as an addon', async () => {
+    assert.equal(EMPTY_PLUGIN.kind, 'stremio')
+    assert.equal((await addPlugin({ name: 'A', url: 'https://a.test' })).kind, 'stremio')
   })
 })
 
@@ -193,104 +69,58 @@ describe('searchAll', () => {
   it('keeps a working source when another fails, and skips disabled ones', async () => {
     stubFetch(async (url) => {
       if (url.includes('bad.test')) throw new TypeError('Failed to fetch')
-      return jsonReply({ data: { items: [{ vod_id: 1, vod_name: 'Hit' }] } })
+      if (url.includes('manifest')) return jsonReply(MANIFEST)
+      return jsonReply({ metas: [{ id: 'tt1', type: 'series', name: 'Hit' }] })
     })
 
     const groups = await searchAll(
       [
-        { ...PLUGIN, id: 'good', name: 'Good' },
-        {
-          ...PLUGIN,
-          id: 'bad',
-          name: 'Bad',
-          search: { ...PLUGIN.search, url: 'https://bad.test/{query}' },
-        },
-        { ...PLUGIN, id: 'off', enabled: false },
+        { ...ADDON, id: 'good', name: 'Good' },
+        { ...ADDON, id: 'bad', name: 'Bad', url: 'https://bad.test/manifest.json' },
+        { ...ADDON, id: 'off', enabled: false },
       ],
       'q',
     )
 
     assert.equal(groups.length, 2, 'a disabled source is not queried')
-    const bad = groups.find((g) => g.plugin.id === 'bad')
-    assert.equal(groups.find((g) => g.plugin.id === 'good').results.length, 1)
-    assert.match(bad.error, /Failed to fetch/)
-    assert.equal(bad.done, true, 'a failed source must not offer More')
-  })
-})
-
-describe('loadMore', () => {
-  const pages = { 1: ['A', 'B'], 2: ['C', 'D'], 3: [] }
-  const paged = () =>
-    stubFetch(async (url) => {
-      const page = Number(new URL(url).searchParams.get('page'))
-      return jsonReply({
-        data: {
-          items: (pages[page] ?? []).map((t, i) => ({ vod_id: `${page}${i}`, vod_name: t })),
-        },
-      })
-    })
-
-  it('appends the next page', async () => {
-    paged()
-    let [group] = await searchAll([PLUGIN], 'x')
-    group = await loadMore(group, 'x')
-    assert.deepEqual(
-      group.results.map((r) => r.title),
-      ['A', 'B', 'C', 'D'],
-    )
-    assert.equal(group.page, 2)
-    assert.equal(group.done, false)
+    assert.equal(groups.find((group) => group.plugin.id === 'good').results.length, 1)
+    assert.match(groups.find((group) => group.plugin.id === 'bad').error, /Failed to fetch/)
   })
 
-  it('stops when a page brings nothing', async () => {
-    paged()
-    let [group] = await searchAll([PLUGIN], 'x')
-    group = await loadMore(await loadMore(group, 'x'), 'x')
-    assert.equal(group.results.length, 4)
-    assert.equal(group.done, true)
-  })
-
-  it('stops instead of looping when the URL has no {page}', async () => {
-    stubFetch(async () => jsonReply({ data: { items: [{ vod_id: 1, vod_name: 'A' }] } }))
-    const unpaged = { ...PLUGIN, search: { ...PLUGIN.search, url: 'https://api.test/s?q={query}' } }
-    let [group] = await searchAll([unpaged], 'x')
-    group = await loadMore(group, 'x')
-    assert.equal(group.results.length, 1, 'the repeated page is not appended')
-    assert.equal(group.done, true)
+  it('no longer reports paging, which the protocol does not have', async () => {
+    stubFetch(async () => jsonReply(MANIFEST))
+    const [group] = await searchAll([ADDON], 'q')
+    assert.ok(!('page' in group) && !('done' in group))
   })
 })
 
 describe('refreshMovie', () => {
+  const meta = (videos) => ({ meta: { id: 'tt1', type: 'series', name: 'Show', videos } })
+
   const build = async () => {
-    stubFetch(async () =>
-      jsonReply({ data: { play: [{ list: [{ name: 'Ep 1', path: 'x/1' }] }] } }),
-    )
+    stubFetch(async () => jsonReply(meta([{ id: 'tt1:1:1', title: 'Pilot' }])))
     return addMovie({
       title: 'Mine',
-      episodes: await fetchEpisodes(PLUGIN, { id: '42' }),
-      source: { pluginId: 'p1', itemId: '42' },
+      source: { pluginId: 'p1', itemId: 'tt1', type: 'series' },
+      episodes: [
+        { title: 'Pilot', stream: { pluginId: 'p1', type: 'series', videoId: 'tt1:1:1' } },
+      ],
     })
   }
 
-  it('adds new episodes while keeping the ones already there', async () => {
+  it('adds the new episodes and keeps what was there', async () => {
     const movie = await build()
     const firstId = movie.episodes[0].id
 
     stubFetch(async () =>
-      jsonReply({
-        data: {
-          play: [
-            {
-              list: [
-                { name: 'Ep 1', path: 'x/1' },
-                { name: 'Ep 2', path: 'x/2' },
-              ],
-            },
-          ],
-        },
-      }),
+      jsonReply(
+        meta([
+          { id: 'tt1:1:1', title: 'Pilot' },
+          { id: 'tt1:1:2', title: 'Second' },
+        ]),
+      ),
     )
-    const { added } = await refreshMovie(movie, [PLUGIN])
+    const { added } = await refreshMovie(movie, [ADDON])
     const after = (await getLibrary()).movies[0]
 
     assert.equal(added, 1)
@@ -303,30 +133,24 @@ describe('refreshMovie', () => {
     const movie = await build()
     await assert.rejects(() => refreshMovie(movie, []), /source this movie came from is gone/)
   })
-
-  it('refuses rather than emptying the movie', async () => {
-    const movie = await build()
-    stubFetch(async () => jsonReply({ data: { play: [{ list: [] }] } }))
-    await assert.rejects(() => refreshMovie(movie, [PLUGIN]), /returned no episodes/)
-  })
 })
 
 describe('pluginToJson', () => {
-  it('shares everything but the local id', () => {
-    const shared = JSON.parse(pluginToJson(PLUGIN))
+  it('shares the addon without the local id', () => {
+    const shared = JSON.parse(pluginToJson(ADDON))
     assert.ok(!('id' in shared), 'the receiving install issues its own')
     assert.ok(!('enabled' in shared), 'the default needs no stating')
-    assert.equal(shared.adPattern, PLUGIN.adPattern)
-    assert.equal(shared.details.fields.src, 'https://cdn.test/{path}.m3u8')
+    assert.equal(shared.url, ADDON.url)
+    assert.equal(shared.adPattern, ADDON.adPattern)
   })
 
   it('states a source that is switched off', () => {
-    assert.equal(JSON.parse(pluginToJson({ ...PLUGIN, enabled: false })).enabled, false)
+    assert.equal(JSON.parse(pluginToJson({ ...ADDON, enabled: false })).enabled, false)
   })
 
   it('round trips through the paste form', () => {
-    const restored = { ...structuredClone(EMPTY_PLUGIN), ...JSON.parse(pluginToJson(PLUGIN)) }
-    assert.equal(restored.search.url, PLUGIN.search.url)
+    const restored = { ...structuredClone(EMPTY_PLUGIN), ...JSON.parse(pluginToJson(ADDON)) }
+    assert.equal(restored.url, ADDON.url)
     assert.equal(restored.enabled, true)
   })
 })

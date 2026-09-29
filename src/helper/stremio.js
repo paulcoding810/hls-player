@@ -1,4 +1,3 @@
-import { fetchJson } from './plugins'
 import { normalizeSource } from '@/utils/url'
 
 /**
@@ -8,6 +7,38 @@ import { normalizeSource } from '@/utils/url'
  * names and the player resolves it on play — see `episodeKey` in `library.js`
  * for what that means for stored positions.
  */
+
+/** A dead host must not hang the search. */
+const TIMEOUT = 10_000
+
+async function fetchJson(url, label) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT)
+  try {
+    // Each failure is caught where it happens, so a message this function
+    // writes is never caught and labelled a second time on the way out.
+    let response
+    try {
+      response = await fetch(url, { signal: controller.signal })
+    } catch (error) {
+      throw new Error(
+        error.name === 'AbortError'
+          ? `${label} did not answer in time.`
+          : `${label}: ${error.message}`,
+      )
+    }
+
+    if (!response.ok) throw new Error(`${label} answered ${response.status}.`)
+
+    try {
+      return await response.json()
+    } catch {
+      throw new Error(`${label} did not return JSON.`)
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 /** A manifest changes rarely, and a search asks for it once per catalog. */
 const manifests = new Map()

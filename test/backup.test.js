@@ -16,18 +16,9 @@ beforeEach(() => {
 const seed = async () => {
   const plugin = await addPlugin({
     name: 'Src',
+    url: 'https://addon.test/manifest.json',
     referer: 'https://ref.test/',
     adPattern: '^/ads/.+\\.ts$',
-    search: {
-      url: 'https://a/?q={query}',
-      list: 'items',
-      fields: { id: 'i', title: 't', poster: 'p' },
-    },
-    details: {
-      url: 'https://a/{id}',
-      episodes: 'eps',
-      fields: { title: 'n', src: 'u', subtitles: 's' },
-    },
   })
   const movie = await addMovie({
     title: 'From source',
@@ -85,7 +76,11 @@ describe('readBackup', () => {
             'not an object',
           ],
         },
-        plugins: [{ name: '' }, { name: 'Ok', enabled: false }, null],
+        plugins: [
+          { name: '' },
+          { name: 'Ok', kind: 'stremio', url: 'https://a.test/manifest.json', enabled: false },
+          null,
+        ],
         progress: {
           'https://x.test/1.m3u8': { position: 90, duration: 600, updatedAt: 5 },
           'javascript:alert(1)': { position: 5, duration: 10, updatedAt: 9 },
@@ -100,9 +95,29 @@ describe('readBackup', () => {
     assert.equal(Object.keys(parsed.progress).length, 1, 'a junk position key is dropped')
   })
 
+  it('refuses a source described by hand-written paths', () => {
+    // An older export must not reintroduce one nothing can read.
+    const parsed = readBackup(
+      JSON.stringify({
+        format: 'hls-player-backup',
+        version: 1,
+        plugins: [
+          { name: 'My API', search: { url: 'https://a/?q={query}' } },
+          { name: 'Addon', kind: 'stremio', url: 'https://addon.test/manifest.json' },
+        ],
+      }),
+    )
+    assert.equal(parsed.plugins.length, 1)
+    assert.equal(parsed.plugins[0].name, 'Addon')
+  })
+
   it('accepts a file holding only sources', () => {
     const parsed = readBackup(
-      JSON.stringify({ format: 'hls-player-backup', version: 1, plugins: [{ name: 'Solo' }] }),
+      JSON.stringify({
+        format: 'hls-player-backup',
+        version: 1,
+        plugins: [{ name: 'Solo', kind: 'stremio', url: 'https://solo.test/manifest.json' }],
+      }),
     )
     assert.equal(parsed.plugins.length, 1)
   })
@@ -123,7 +138,7 @@ describe('a full round trip', () => {
     assert.equal(restoredMovie.title, movie.title)
     assert.deepEqual(restoredMovie.source, { pluginId: plugin.id, itemId: '42' })
     assert.equal(restoredPlugin.id, plugin.id, 'so refresh still resolves the source')
-    assert.equal(restoredPlugin.details.fields.subtitles, 's')
+    assert.equal(restoredPlugin.url, 'https://addon.test/manifest.json')
   })
 
   // This has been missed once per field added: `sanitizeMovie` names each one.

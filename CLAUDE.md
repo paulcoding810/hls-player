@@ -25,17 +25,16 @@ movies, a movie holds episodes plus its own config, and it carries three timesta
 `skipLeading/skipTrailing: null`) inherit from the global settings via `resolveConfig`. Playback
 positions live in a separate store (`src/helper/progress.js`) keyed by episode URL; a finished
 episode has its entry dropped rather than kept, so `movie.watchedAt` — set by `markWatched()`,
-cleared by `setLastPlayed()` — is what tells a watched movie from one never opened. Source plugins live in a
-fourth store (`src/helper/plugins.js`): each one describes a site's JSON API as two URL templates
-plus paths, read by `readPath`/`fillTemplate` in `src/utils/jsonPath.js` — whose `|` filters are
-the only way a source can reshape a value, since it cannot ship code to do it. A plugin can never hold
-code — MV3 forbids `eval`, so extraction is data; do not "simplify" it into a callback. A plugin also carries the
-site's `referer` and `adPattern`, copied onto each movie it adds rather than looked up later. A source may instead be a
-Stremio addon (`kind: 'stremio'`, `src/helper/stremio.js`), whose episodes name a video rather than
-a URL and are resolved by `resolveStream()` on every play — so `episodeKey()` in `library.js`, not
-the URL, is an episode's identity and the key progress is stored under. A movie
-added from one carries `source: { pluginId, itemId }`, which is what the gallery's refresh button
-uses to re-read episodes through the existing `setEpisodes`. All three stores,
+cleared by `setLastPlayed()` — is what tells a watched movie from one never opened. Source plugins live in a fourth store
+(`src/helper/plugins.js`), and a source is a Stremio addon: one manifest URL, with
+`src/helper/stremio.js` speaking the protocol. Its episodes name a video rather than a URL and are
+resolved by `resolveStream()` on every play, so `episodeKey()` in `library.js` — not the URL — is an
+episode's identity and the key progress is stored under. `kind` carries its one value on purpose:
+it is what lets a source stored before the custom-API kind was removed, or imported from an older
+export, be recognised and dropped. A plugin also carries the site's `referer` and `adPattern`,
+copied onto each movie it adds rather than looked up later. A movie added from one carries
+`source: { pluginId, itemId, type }`, which is what the gallery's refresh button uses to re-read
+episodes through the existing `setEpisodes`. All three stores,
 plus the settings, round-trip through `src/helper/backup.js` — `readBackup` sanitizes an untrusted
 file and `applyBackup` merges it by movie id, behind the Data section of the options page.
 

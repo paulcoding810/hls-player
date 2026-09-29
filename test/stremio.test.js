@@ -198,6 +198,55 @@ describe('resolveStream', () => {
   })
 })
 
+describe('a failing addon', () => {
+  // These messages moved here with `fetchJson`, which now lives beside the
+  // protocol that produces them.
+  const cases = {
+    'a bad status': [async () => jsonReply({}, { ok: false, status: 404 }), /Addon answered 404/],
+    'a body that is not JSON': [
+      async () => ({
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw new SyntaxError('bad')
+        },
+      }),
+      /did not return JSON/,
+    ],
+    'a timeout': [
+      async () => {
+        const error = new Error('aborted')
+        error.name = 'AbortError'
+        throw error
+      },
+      /did not answer in time/,
+    ],
+    'a network error': [
+      async () => {
+        throw new TypeError('Failed to fetch')
+      },
+      /Failed to fetch/,
+    ],
+  }
+
+  for (const [name, [handler, message]] of Object.entries(cases)) {
+    it(`reports ${name}`, async () => {
+      stubFetch(handler)
+      await assert.rejects(() => searchStremio(ADDON, 'x'), message)
+    })
+  }
+
+  it('names the addon exactly once', async () => {
+    stubFetch(async () => jsonReply({}, { ok: false, status: 404 }))
+    const error = await searchStremio(ADDON, 'x').catch((thrown) => thrown)
+    assert.equal(error.message.match(/Addon/g).length, 1)
+  })
+
+  it('refuses a source with no manifest URL', async () => {
+    await assert.rejects(() => searchStremio({ ...ADDON, url: '' }, 'x'), /manifest URL/)
+  })
+})
+
 describe('episodeKey', () => {
   it('is the URL for an ordinary episode, so stored positions still resolve', () => {
     assert.equal(episodeKey({ src: 'https://x.test/1.m3u8' }), 'https://x.test/1.m3u8')

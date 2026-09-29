@@ -150,122 +150,33 @@ form does. A bad field is reported by name rather than silently dropped.
 
 ## Sources
 
-A **source** describes one site's JSON API so the library can search it directly instead of you
-pasting every episode URL. Sources are managed on the options page, and once one is enabled the
-library grows a search bar: type a title, pick a result, and its episodes arrive filled in.
+A **source** is a [Stremio](https://www.stremio.com) addon, so the library can search it directly
+instead of you pasting every episode URL. Add one on the options page with its manifest URL —
+`https://v3-cinemeta.strem.io/manifest.json`, say — and the library's search bar queries every
+enabled source at once, grouping the results. A source that fails shows its error in its own group
+rather than taking the search down, and a result already in the library reads **Watch**.
 
-A source holds no code. MV3 pins extension pages to `script-src 'self'` with no `unsafe-eval`, so
-there is no way to run a parse function you supply — the same rule behind the worker-less video.js
-build below. Instead you say _where_ the values are:
-
-```json
-{
-  "name": "Example",
-  "referer": "https://example.com/",
-  "adPattern": "^/ads/.+\\.ts$",
-  "search": {
-    "url": "https://api.example.com/search?q={query}&page={page}",
-    "list": "data.items",
-    "fields": { "id": "vod_id", "title": "vod_name", "poster": "vod_pic" }
-  },
-  "details": {
-    "url": "https://api.example.com/detail/{id}",
-    "episodes": "data.play[0].list",
-    "fields": {
-      "title": "name",
-      "src": "https://cdn.example.com/{path}.m3u8",
-      "subtitle": "https://cdn.example.com/{path}.vtt"
-    }
-  }
-}
-```
-
-- **Paths** are dots and `[0]` indices — `data.play[0].list`. A path that matches nothing yields
-  nothing rather than an error, so a wrong one shows up as an empty result, not a crash.
-- **`{page}`** in the search URL counts from 1 and drives the **More** button under each group
-  of results. It is optional: leave it out and you get one page.
-- **Templates** substitute `{name}` from the entry being read. `{query}` is percent-encoded
-  because it is free text you typed; every other placeholder goes in raw, since those are path
-  fragments the API returned. A field whose template still has an unfilled placeholder is dropped
-  rather than half-built.
-- A field is treated as a template if it contains `{`, and as a path otherwise — so `src` can be
-  either `url` (a path to a ready-made URL) or the template above.
-- **Filters** reshape a value on the way in, for when a source returns something close to the URL
-  you need rather than it: `{url|replace:video,stream}/master.m3u8`. They chain, and work in any
-  templated field.
-
-| Filter            | Does                                                             |
-| ----------------- | ---------------------------------------------------------------- |
-| `replace:from,to` | swaps `from` for `to` — **every** occurrence, not just the first |
-| `lower` / `upper` | changes case                                                     |
-| `trim`            | drops surrounding whitespace                                     |
-| `encode`          | percent-encodes, for a value going into a query string           |
-
-`|` separates the filters, the first `:` separates a filter from its argument, and the first `,`
-separates `from` from `to` — so both may themselves contain `:` and `,`, as URLs do. An empty `to`
-removes (`{id|replace:vod-,}`). A misspelled filter leaves the placeholder in place, which makes
-the field unusable and drops it, rather than storing a URL built around the literal text.
-
-`referer` and `adPattern` describe the site rather than its API, so they are handed to every movie
-added from the source and take effect during playback — see
-[Server-side ad insertion](#server-side-ad-insertion) for what the pattern matches. They are copied
-at the moment a movie is added, not looked up later: changing them on the source updates what new
-movies inherit, and leaves movies already in the library alone, the same way editing a movie is
-never undone by a refresh.
-
-Each source in the list has a **copy** button that puts it on the clipboard in exactly the shape
-**Paste JSON instead** reads back, so a working source can be handed to someone else. Its local id
-is left out — the receiving install issues its own — and a source that is switched off says so,
-rather than arriving quietly enabled.
-
-**Test** in the source form runs a real search for "test" and shows what it extracted. Getting the
-paths right against someone else's JSON is the fiddly part; this is how you do it without guessing.
-
-The box above the grid does two things. **Typing filters the library you already have** — matching
-movie titles, as you type, with no network involved. **Enter searches your sources**, replacing the
-grid with grouped results. Typing again drops back to filtering, and the clear button returns to
-the full library.
-
-The box is there whenever you have movies, even with no sources configured; the **Search** button
-is what needs one.
-
-Searching queries every enabled source at once and groups the results. A source that fails shows
-its error in its own group instead of taking the search down. A result already in the library
-offers **Watch** instead of **Add**.
-
-Each result also has a **copy** button, which fetches its episodes and puts the movie on the
-clipboard in the same shape **Paste JSON instead** reads back — so a title can be shared, kept, or
-tweaked by hand before adding. Blank fields are left out rather than written empty, since absent
-means "inherit the global default" in that shape.
-
-**More** under a group fetches that source's next page and appends it — each source pages
-independently, since one may have more to give than another. Results already shown are not
-repeated, which is also what stops a search URL with no `{page}` in it: the same page comes back,
-nothing is new, and the button retires instead of offering itself for ever.
-
-### Stremio addons
-
-A source can instead be a [Stremio](https://www.stremio.com) addon: choose **Stremio addon** on the
-source form and paste its manifest URL, such as `https://v3-cinemeta.strem.io/manifest.json`. It
-then answers the same search bar as any other source.
-
-Addons work differently from a custom API, and the difference shows: a catalog gives titles, a
-title gives _videos_, and the playable URL comes from a third request made **when you press play**.
-So a Stremio episode stores the video it names rather than a URL, and the player shows
+Addons work in three steps, and the third is the one that shows: a catalog gives titles, a title
+gives _videos_, and the playable URL comes from a separate request made **when you press play**. So
+a Stremio episode stores the video it names rather than a URL, and the player shows
 **Finding a stream…** briefly before playback. The URL an addon hands out is often short-lived,
 which is why it is not stored.
 
 That has one consequence worth knowing: an episode's watched position is stored against the video
-id rather than the URL, so it survives the URL changing between plays. Episodes added any other
-way are unaffected — their URL is still the key, and every position already stored still resolves.
+id rather than the URL, so it survives the URL changing between plays. Episodes added by hand are
+unaffected — their URL is still the key, and every position already stored still resolves.
 
 The first stream the addon offers that this player can open is the one that plays. If it marks a
 stream with `proxyHeaders`, the `Referer` there is applied through the same header override the
-rest of the app uses.
+rest of the app uses. A source's own **Referer** and **ad segment pattern** are copied onto every
+movie it adds, as playback settings.
 
-**Limits.** Torrent addons do not work — `infoHash` needs a BitTorrent client and there is none
-here, so a torrent-only addon reports that it found nothing playable. Catalogs that do not declare
-a `search` extra are not queried, and Stremio results are not paged.
+**Test** on the source form runs a real search against the addon, which is the only way to know it
+answers before saving it.
+
+Sources travel with the export, and each has a **copy** button that puts it on the clipboard in the
+shape **Paste JSON instead** reads back — its local id left out, so it can be handed to someone
+else.
 
 ### Refreshing
 
@@ -276,13 +187,14 @@ keep their identity, so watch positions and "last episode" survive a refresh.
 
 ### Limits
 
-- **JSON only.** A site that returns HTML cannot be scraped; that needs exactly the code execution
-  MV3 forbids.
-- **No `Referer` on the API call.** `Referer` is a forbidden header for `fetch`, just as it is for
-  the player's XHR — which is why playback uses declarativeNetRequest instead. A source's
-  `Referer` is given to the movies it adds, for playback. An API that rejects requests without one
-  will not work.
-- Firefox needs the host permission granted; the options page prompts for it.
+**Torrent addons do not work.** `infoHash` needs a BitTorrent client and there is none here, so
+a torrent-only addon reports that it found nothing playable. `behaviorHints.notWebReady` marks a
+stream the browser may not play directly; it is attempted anyway, and failure surfaces in the
+usual error banner. Catalogs that do not declare a `search` extra are not queried, and results
+are not paged — one page per catalog is what you get.
+
+A resolved URL is not stored, so the episode list shows the video id rather than a URL — the
+trade taken for surviving expiry.
 
 ## Player URLs
 

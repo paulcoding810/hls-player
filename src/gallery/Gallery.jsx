@@ -42,7 +42,8 @@ import {
 } from '@/helper/library'
 import { openOptions, playerUrlForEpisode } from '@/helper/player'
 import { addMovie as addLibraryMovie } from '@/helper/library'
-import { fetchEpisodes, getPlugins, loadMore, refreshMovie, searchAll } from '@/helper/plugins'
+import { getPlugins, refreshMovie, searchAll } from '@/helper/plugins'
+import { fetchStremioEpisodes } from '@/helper/stremio'
 import { getAllProgress } from '@/helper/progress'
 import { formatTime } from '@/utils/time'
 
@@ -228,8 +229,6 @@ export default function Gallery() {
   const [searching, setSearching] = useState(false)
   /** `pluginId:itemId` of the result being added, and a page-level error. */
   const [adding, setAdding] = useState('')
-  /** Plugin id whose next page is in flight. */
-  const [loadingMore, setLoadingMore] = useState('')
   /** `pluginId:itemId` of the result being copied. */
   const [copying, setCopying] = useState('')
   /** `{ tone, message }`; errors are `danger`, confirmations `warn`. */
@@ -307,34 +306,13 @@ export default function Gallery() {
     }
   }
 
-  const showMore = async (group) => {
-    setLoadingMore(group.plugin.id)
-    setNotice(null)
-    try {
-      const next = await loadMore(group, query.trim())
-      setGroups((current) =>
-        current.map((item) => (item.plugin.id === group.plugin.id ? next : item)),
-      )
-    } catch (error) {
-      setNotice({ tone: 'danger', message: error.message })
-      // A page that failed should not leave More offering itself for ever.
-      setGroups((current) =>
-        current.map((item) =>
-          item.plugin.id === group.plugin.id ? { ...item, done: true } : item,
-        ),
-      )
-    } finally {
-      setLoadingMore('')
-    }
-  }
-
   /** The same JSON the Add movie form's Paste JSON mode reads back. */
   const copyResult = async (plugin, result) => {
     const key = `${plugin.id}:${result.id}`
     setCopying(key)
     setNotice(null)
     try {
-      const episodes = await fetchEpisodes(plugin, result)
+      const episodes = await fetchStremioEpisodes(plugin, result)
       if (!episodes.length) throw new Error(`${plugin.name} returned no episodes for this title.`)
 
       await navigator.clipboard.writeText(
@@ -362,7 +340,7 @@ export default function Gallery() {
     setAdding(key)
     setNotice(null)
     try {
-      const episodes = await fetchEpisodes(plugin, result)
+      const episodes = await fetchStremioEpisodes(plugin, result)
       if (!episodes.length) throw new Error(`${plugin.name} returned no episodes for this title.`)
 
       await addLibraryMovie({
@@ -525,10 +503,8 @@ export default function Gallery() {
           adding={adding}
           onAdd={addResult}
           onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
-          onMore={showMore}
           onCopy={copyResult}
           copying={copying}
-          loadingMore={loadingMore}
         />
       ) : (
         <>

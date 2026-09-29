@@ -13,10 +13,8 @@ export default function SearchResults({
   adding,
   onAdd,
   onWatch,
-  onMore,
   onCopy,
   copying,
-  loadingMore,
 }) {
   const total = groups.reduce((count, group) => count + group.results.length, 0)
 
@@ -94,17 +92,6 @@ export default function SearchResults({
               </article>
             )
           })}
-
-          {!group.error && !group.done && (
-            <button
-              type="button"
-              onClick={() => onMore(group)}
-              disabled={loadingMore === group.plugin.id}
-              className={`${ghostButtonClass} self-start`}
-            >
-              {loadingMore === group.plugin.id ? 'Loading…' : 'More'}
-            </button>
-          )}
         </section>
       ))}
     </div>

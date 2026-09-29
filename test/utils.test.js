@@ -1,104 +1,12 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { fillTemplate, readPath } from '@/utils/jsonPath'
 import { labelFor, readSubtitles, toVtt } from '@/utils/subtitles'
 import { findPayloadStart, stripDecoyPrefix, PNG_SIGNATURE } from '@/utils/segments'
 import { formatTime } from '@/utils/time'
 import { SUBTITLE_POSITIONS, SUBTITLE_SIZES } from '@/helper/constants'
 import { DEFAULT_SETTINGS, sanitizeSettings } from '@/helper/settings'
 import { manifestMime, isManifestUrl, normalizeReferer, normalizeSource } from '@/utils/url'
-
-describe('readPath', () => {
-  const doc = { data: { play: [{ list: [{ name: 'One' }] }], zero: 0, nothing: null } }
-
-  it('walks objects and [n] indices', () =>
-    assert.equal(readPath(doc, 'data.play[0].list[0].name'), 'One'))
-  it('keeps a falsy value', () => assert.equal(readPath(doc, 'data.zero'), 0))
-  it('reads a bare index', () => assert.equal(readPath([9, 8], '[1]'), 8))
-
-  // A wrong path runs inside a fetch handler, where a throw loses the search.
-  for (const [name, path] of [
-    ['a missing segment', 'data.nope.deep'],
-    ['a path through null', 'data.nothing.deep'],
-    ['an empty path', ''],
-    ['an object where an array was expected', 'data.play.name'],
-  ]) {
-    it(`is undefined for ${name}`, () => assert.equal(readPath(doc, path), undefined))
-  }
-
-  it('never throws on junk', () => assert.equal(readPath(undefined, 'a.b[0].c'), undefined))
-})
-
-describe('fillTemplate', () => {
-  it('percent-encodes {query}, which a person typed', () =>
-    assert.equal(
-      fillTemplate('https://s/?q={query}', { query: 'a b&c' }),
-      'https://s/?q=a%20b%26c',
-    ))
-  it('leaves other values raw, being path fragments the API returned', () =>
-    assert.equal(fillTemplate('https://s/{path}.m3u8', { path: 'a/b' }), 'https://s/a/b.m3u8'))
-  it('fills a placeholder used twice', () =>
-    assert.equal(fillTemplate('{id}-{id}', { id: 7 }), '7-7'))
-  it('leaves an unknown placeholder visible rather than blanking it', () =>
-    assert.equal(fillTemplate('https://s/{nope}', {}), 'https://s/{nope}'))
-
-  describe('filters', () => {
-    const fill = (template, values) => fillTemplate(template, values)
-
-    it('does the worked example end to end', () =>
-      assert.equal(
-        fill('{url|replace:video,stream}/master.m3u8', { url: 'https://cdn/video/abc' }),
-        'https://cdn/stream/abc/master.m3u8',
-      ))
-
-    it('splits the argument on the first colon, so a URL survives', () =>
-      assert.equal(fill('{u|replace:http://a,https://b}', { u: 'http://a/x' }), 'https://b/x'))
-
-    it('splits from,to on the first comma, so the replacement may hold one', () =>
-      assert.equal(fill('{u|replace:x,a,b}', { u: '1x2' }), '1a,b2'))
-
-    it('removes when there is no replacement', () =>
-      assert.equal(fill('{id|replace:vod-,}', { id: 'vod-42' }), '42'))
-
-    it('replaces every occurrence, not just the first', () =>
-      assert.equal(
-        fill('{u|replace:video,stream}', { u: 'https://video.host/video/a' }),
-        'https://stream.host/stream/a',
-      ))
-
-    it('chains', () =>
-      assert.equal(fill('{u|trim|lower|replace: ,-}', { u: '  Big Title ' }), 'big-title'))
-
-    it('offers the case and trim filters', () => {
-      assert.equal(fill('{u|upper}', { u: 'ab' }), 'AB')
-      assert.equal(fill('{u|lower}', { u: 'AB' }), 'ab')
-      assert.equal(fill('{u|trim}', { u: '  a  ' }), 'a')
-      assert.equal(fill('{u|encode}', { u: 'a b&c' }), 'a%20b%26c')
-    })
-
-    it('leaves the placeholder standing for a misspelled filter', () =>
-      // `valueOf` then drops the field, rather than building a URL around it.
-      assert.equal(fill('{u|replce:a,b}', { u: 'x' }), '{u|replce:a,b}'))
-
-    it('leaves it standing for a missing value even with filters', () =>
-      assert.equal(fill('{nope|upper}', {}), '{nope|upper}'))
-
-    it('still encodes {query}, after any filters', () => {
-      assert.equal(fill('?q={query}', { query: 'a b' }), '?q=a%20b')
-      assert.equal(fill('?q={query|upper}', { query: 'a b' }), '?q=A%20B')
-    })
-
-    it('leaves a plain template exactly as it was', () => {
-      // The regression that matters: every existing source uses these.
-      assert.equal(fill('https://cdn/{path}.m3u8', { path: 'a/b' }), 'https://cdn/a/b.m3u8')
-      assert.equal(fill('{id}-{id}', { id: 7 }), '7-7')
-      assert.equal(fill('https://api/d/{id}', { id: '42' }), 'https://api/d/42')
-    })
-
-    it('ignores an empty brace pair', () => assert.equal(fill('https://s/{}', {}), 'https://s/{}'))
-  })
-})
 
 describe('toVtt', () => {
   const SRT = '1\n00:00:01,000 --> 00:00:04,000\nHello\n\n2\n0:00:05,500 --> 0:00:07,250\nWorld'

@@ -118,27 +118,19 @@ function sanitizeProgress(raw) {
 function sanitizePlugin(raw) {
   if (!raw || typeof raw !== 'object') return null
   const name = string(raw.name).trim()
-  if (!name) return null
-
-  const part = (section, keys) => ({
-    url: string(raw[section]?.url).trim(),
-    [keys]: string(raw[section]?.[keys]).trim(),
-    fields: Object.fromEntries(
-      Object.entries(raw[section]?.fields ?? {}).map(([key, value]) => [key, string(value).trim()]),
-    ),
-  })
+  const url = string(raw.url).trim()
+  // An older file may hold a source described by hand-written paths. Nothing
+  // reads those any more, so it is refused rather than stored unusable.
+  if (!name || raw.kind !== 'stremio' || !url) return null
 
   return {
     ...EMPTY_PLUGIN,
     id: string(raw.id) || crypto.randomUUID(),
     name,
+    url,
     enabled: raw.enabled !== false,
     referer: string(raw.referer),
     adPattern: string(raw.adPattern).trim(),
-    kind: raw.kind === 'stremio' ? 'stremio' : 'json',
-    url: string(raw.url).trim(),
-    search: part('search', 'list'),
-    details: part('details', 'episodes'),
   }
 }
 
