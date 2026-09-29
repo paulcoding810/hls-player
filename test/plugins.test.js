@@ -66,6 +66,19 @@ describe('the source store', () => {
 })
 
 describe('searchAll', () => {
+  it('returns a group per catalog, carrying the source it came from', async () => {
+    stubFetch(async (url) => {
+      if (url.includes('manifest')) return jsonReply(MANIFEST)
+      return jsonReply({ metas: [{ id: 'tt1', type: 'series', name: 'Hit' }] })
+    })
+
+    const groups = await searchAll([ADDON], 'q')
+    assert.equal(groups.length, 1)
+    assert.equal(groups[0].plugin.id, 'p1')
+    assert.equal(groups[0].catalog.name, 'Top')
+    assert.equal(groups[0].results.length, 1)
+  })
+
   it('keeps a working source when another fails, and skips disabled ones', async () => {
     stubFetch(async (url) => {
       if (url.includes('bad.test')) throw new TypeError('Failed to fetch')
@@ -82,9 +95,13 @@ describe('searchAll', () => {
       'q',
     )
 
-    assert.equal(groups.length, 2, 'a disabled source is not queried')
+    assert.ok(!groups.some((group) => group.plugin.id === 'off'), 'a disabled source is skipped')
     assert.equal(groups.find((group) => group.plugin.id === 'good').results.length, 1)
-    assert.match(groups.find((group) => group.plugin.id === 'bad').error, /Failed to fetch/)
+
+    // The manifest failed, so which catalogs exist is unknown.
+    const bad = groups.find((group) => group.plugin.id === 'bad')
+    assert.equal(bad.catalog, null)
+    assert.match(bad.error, /Failed to fetch/)
   })
 
   it('no longer reports paging, which the protocol does not have', async () => {

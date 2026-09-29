@@ -1,10 +1,17 @@
 import { CopyIcon, FilmIcon, PlayIcon, PlusIcon } from './icons'
 import { dangerBannerClass, ghostButtonClass, iconButtonClass } from './ui'
 
+/** `Cinemeta · Top`, and the id when two catalogs of one addon share a name. */
+function headingOf(group) {
+  if (!group.catalog) return group.plugin.name
+  return `${group.plugin.name} · ${group.catalog.name}`
+}
+
 /**
- * Search results from every enabled source, grouped by the source they came
- * from. A source that failed keeps its group and shows why, so a broken one is
- * visible rather than silently missing.
+ * Search results grouped by the catalog they came from — an addon publishes one
+ * per type, and "Series" and "Movies" are different answers to the same
+ * question. A catalog that failed keeps its group and shows why, so a broken
+ * one is visible rather than silently missing.
  */
 export default function SearchResults({
   groups,
@@ -16,26 +23,28 @@ export default function SearchResults({
   onCopy,
   copying,
 }) {
-  const total = groups.reduce((count, group) => count + group.results.length, 0)
+  // A catalog with nothing in it is noise once there are several per source;
+  // when they are all empty the page says so once instead.
+  const shown = groups.filter((group) => group.results.length || group.error)
 
   if (busy) return <p className="text-ink-faint text-sm">Searching…</p>
 
   return (
     <div className="flex flex-col gap-6">
-      {total === 0 && groups.every((group) => !group.error) && (
-        <p className="text-ink-faint text-sm">Nothing found.</p>
-      )}
+      {shown.length === 0 && <p className="text-ink-faint text-sm">Nothing found.</p>}
 
-      {groups.map((group) => (
-        <section key={group.plugin.id} className="flex flex-col gap-2">
+      {shown.map((group) => (
+        <section
+          key={`${group.plugin.id}:${group.catalog?.type}:${group.catalog?.id}`}
+          className="flex flex-col gap-2"
+        >
           <h2 className="text-ink-faint text-[11px] font-medium tracking-wider uppercase">
-            {group.plugin.name}
+            {headingOf(group)}
+            {group.catalog && <span className="text-ink-faint/70"> · {group.catalog.type}</span>}
           </h2>
 
-          {group.error ? (
+          {group.error && (
             <p className={`${dangerBannerClass} border-line rounded-md border`}>{group.error}</p>
-          ) : (
-            group.results.length === 0 && <p className="text-ink-faint text-sm">No results.</p>
           )}
 
           {group.results.map((result) => {

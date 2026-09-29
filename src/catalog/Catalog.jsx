@@ -204,7 +204,9 @@ export default function Catalog() {
 
   const sources = plugins.some((plugin) => plugin.enabled)
   /** One group, so browse results reuse the search list and its buttons. */
-  const browsed = picked ? [{ plugin: picked.plugin, results, error: '' }] : []
+  const browsed = picked
+    ? [{ plugin: picked.plugin, catalog: picked.catalog, results, error: '' }]
+    : []
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col p-6">

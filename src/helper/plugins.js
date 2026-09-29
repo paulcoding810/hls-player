@@ -84,15 +84,19 @@ export function pluginToJson(plugin) {
 export async function searchAll(plugins, query) {
   const enabled = plugins.filter((plugin) => plugin.enabled)
 
-  return Promise.all(
+  const sources = await Promise.all(
     enabled.map(async (plugin) => {
       try {
-        return { plugin, results: await searchStremio(plugin, query), error: '' }
+        const catalogs = await searchStremio(plugin, query)
+        return catalogs.map((found) => ({ plugin, ...found }))
       } catch (error) {
-        return { plugin, results: [], error: error.message }
+        // The manifest itself failed, so which catalogs exist is unknown.
+        return [{ plugin, catalog: null, results: [], error: error.message }]
       }
     }),
   )
+
+  return sources.flat()
 }
 
 /**

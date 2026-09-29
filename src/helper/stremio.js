@@ -119,34 +119,34 @@ function searchable(manifest) {
 }
 
 /**
- * Every catalog that declares a `search` extra, merged. An addon usually
- * publishes one per type, so a series and a movie catalog both answer.
+ * One entry per catalog that declares a `search` extra, rather than a merged
+ * list: an addon publishes a catalog per type, and "Series" and "Movies" are
+ * different answers to the same question. A catalog that fails reports itself
+ * instead of vanishing into the others.
  */
 export async function searchStremio(plugin, query) {
   const manifest = await readManifest(plugin)
-  const catalogs = searchable(manifest)
-  if (!catalogs.length) return []
-
   const base = baseOf(plugin)
   const label = plugin.name || manifest?.name || 'The addon'
-  const pages = await Promise.all(
-    catalogs.map(async (catalog) => {
+
+  return Promise.all(
+    searchable(manifest).map(async (catalog) => {
       const url = `${base}/catalog/${catalog.type}/${catalog.id}/search=${encodeURIComponent(query)}.json`
+      const named = { id: catalog.id, type: catalog.type, name: catalog.name || catalog.id }
+
       try {
-        return (await fetchJson(url, label))?.metas ?? []
-      } catch {
-        // One catalog answering 404 for an unsupported search must not lose
-        // the results of the others.
-        return []
+        const metas = (await fetchJson(url, label))?.metas ?? []
+        const seen = new Set()
+        const results = metas
+          .filter((meta) => meta?.id && meta?.name && !seen.has(meta.id) && seen.add(meta.id))
+          .map((meta) => toResult(meta, plugin))
+
+        return { catalog: named, results, error: '' }
+      } catch (error) {
+        return { catalog: named, results: [], error: error.message }
       }
     }),
   )
-
-  const seen = new Set()
-  return pages
-    .flat()
-    .filter((meta) => meta?.id && meta?.name && !seen.has(meta.id) && seen.add(meta.id))
-    .map((meta) => toResult(meta, plugin))
 }
 
 /** `S1E2` when an episode has no title of its own. */

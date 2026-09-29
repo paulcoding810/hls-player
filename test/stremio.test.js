@@ -51,6 +51,8 @@ beforeEach(() => {
 })
 
 describe('searchStremio', () => {
+  const flat = (groups) => groups.flatMap((group) => group.results)
+
   it('asks only the catalogs that declare a search extra', async () => {
     const asked = serve({ manifest: MANIFEST, catalog: { metas: [] } })
     await searchStremio(ADDON, 'godzilla')
@@ -69,22 +71,54 @@ describe('searchStremio', () => {
     )
   })
 
-  it('merges the catalogs and drops a repeat', async () => {
+  it('returns one group per searchable catalog, named', async () => {
+    serve({ manifest: MANIFEST, catalog: { metas: [{ id: 'tt1', type: 'series', name: 'One' }] } })
+    const groups = await searchStremio(ADDON, 'x')
+
+    assert.equal(groups.length, 2)
+    assert.deepEqual(
+      groups.map((group) => [group.catalog.type, group.catalog.name]),
+      [
+        ['series', 'Top'],
+        ['movie', 'Top'],
+      ],
+    )
+  })
+
+  it('keeps the same title in each catalog that returned it', async () => {
+    // Merging used to hide that a title is in both; the groups are the answer.
+    serve({ manifest: MANIFEST, catalog: { metas: [{ id: 'tt1', type: 'series', name: 'One' }] } })
+    assert.equal(flat(await searchStremio(ADDON, 'x')).length, 2)
+  })
+
+  it('still drops a repeat within one catalog', async () => {
+    serve({
+      manifest: MANIFEST,
+      catalog: {
+        metas: [
+          { id: 'tt1', type: 'series', name: 'One' },
+          { id: 'tt1', type: 'series', name: 'One again' },
+        ],
+      },
+    })
+    assert.equal((await searchStremio(ADDON, 'x'))[0].results.length, 1)
+  })
+
+  it('reads the fields a result needs', async () => {
     serve({
       manifest: MANIFEST,
       catalog: {
         metas: [{ id: 'tt1', type: 'series', name: 'One', poster: 'https://p.test/1.jpg' }],
       },
     })
-    const results = await searchStremio(ADDON, 'x')
-    assert.equal(results.length, 1, 'both catalogs returned tt1')
+    const [result] = (await searchStremio(ADDON, 'x'))[0].results
     assert.deepEqual(
-      [results[0].id, results[0].title, results[0].type, results[0].poster],
+      [result.id, result.title, result.type, result.poster],
       ['tt1', 'One', 'series', 'https://p.test/1.jpg'],
     )
   })
 
-  it('keeps the other catalog when one fails', async () => {
+  it('reports a failing catalog in its own group, keeping the other', async () => {
     let call = 0
     stubFetch(async (url) => {
       if (url.includes('manifest')) return jsonReply(MANIFEST)
@@ -92,7 +126,11 @@ describe('searchStremio', () => {
       if (call === 1) return jsonReply({}, { ok: false, status: 404 })
       return jsonReply({ metas: [{ id: 'tt2', type: 'movie', name: 'Two' }] })
     })
-    assert.equal((await searchStremio(ADDON, 'x')).length, 1)
+
+    const groups = await searchStremio(ADDON, 'x')
+    assert.equal(groups.length, 2)
+    assert.match(groups[0].error, /answered 404/)
+    assert.equal(groups[1].results.length, 1)
   })
 
   it('returns nothing when no catalog can be searched', async () => {
@@ -295,6 +333,7 @@ describe('a failing addon', () => {
   for (const [name, [handler, message]] of Object.entries(cases)) {
     it(`reports ${name}`, async () => {
       stubFetch(handler)
+      // The manifest is the first request, so these still reject outright.
       await assert.rejects(() => searchStremio(ADDON, 'x'), message)
     })
   }

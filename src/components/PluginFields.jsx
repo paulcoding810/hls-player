@@ -106,7 +106,8 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
     try {
       // An edited URL must not be answered from the manifest read before it.
       forgetManifest(draft)
-      const results = await searchStremio(draft, 'test')
+      // Grouped by catalog; the form only needs to show that it answered.
+      const results = (await searchStremio(draft, 'test')).flatMap((found) => found.results)
       setTest({ results })
     } catch (testError) {
       setTest({ error: testError.message })
