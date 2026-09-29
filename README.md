@@ -243,6 +243,30 @@ independently, since one may have more to give than another. Results already sho
 repeated, which is also what stops a search URL with no `{page}` in it: the same page comes back,
 nothing is new, and the button retires instead of offering itself for ever.
 
+### Stremio addons
+
+A source can instead be a [Stremio](https://www.stremio.com) addon: choose **Stremio addon** on the
+source form and paste its manifest URL, such as `https://v3-cinemeta.strem.io/manifest.json`. It
+then answers the same search bar as any other source.
+
+Addons work differently from a custom API, and the difference shows: a catalog gives titles, a
+title gives _videos_, and the playable URL comes from a third request made **when you press play**.
+So a Stremio episode stores the video it names rather than a URL, and the player shows
+**Finding a stream…** briefly before playback. The URL an addon hands out is often short-lived,
+which is why it is not stored.
+
+That has one consequence worth knowing: an episode's watched position is stored against the video
+id rather than the URL, so it survives the URL changing between plays. Episodes added any other
+way are unaffected — their URL is still the key, and every position already stored still resolves.
+
+The first stream the addon offers that this player can open is the one that plays. If it marks a
+stream with `proxyHeaders`, the `Referer` there is applied through the same header override the
+rest of the app uses.
+
+**Limits.** Torrent addons do not work — `infoHash` needs a BitTorrent client and there is none
+here, so a torrent-only addon reports that it found nothing playable. Catalogs that do not declare
+a `search` extra are not queried, and Stremio results are not paged.
+
 ### Refreshing
 
 A movie added from a source remembers where it came from and carries a refresh button. It

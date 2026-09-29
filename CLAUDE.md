@@ -30,7 +30,10 @@ fourth store (`src/helper/plugins.js`): each one describes a site's JSON API as 
 plus paths, read by `readPath`/`fillTemplate` in `src/utils/jsonPath.js` — whose `|` filters are
 the only way a source can reshape a value, since it cannot ship code to do it. A plugin can never hold
 code — MV3 forbids `eval`, so extraction is data; do not "simplify" it into a callback. A plugin also carries the
-site's `referer` and `adPattern`, copied onto each movie it adds rather than looked up later. A movie
+site's `referer` and `adPattern`, copied onto each movie it adds rather than looked up later. A source may instead be a
+Stremio addon (`kind: 'stremio'`, `src/helper/stremio.js`), whose episodes name a video rather than
+a URL and are resolved by `resolveStream()` on every play — so `episodeKey()` in `library.js`, not
+the URL, is an episode's identity and the key progress is stored under. A movie
 added from one carries `source: { pluginId, itemId }`, which is what the gallery's refresh button
 uses to re-read episodes through the existing `setEpisodes`. All three stores,
 plus the settings, round-trip through `src/helper/backup.js` — `readBackup` sanitizes an untrusted

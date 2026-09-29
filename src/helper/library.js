@@ -46,11 +46,24 @@ export function findEpisode(movie, episodeId) {
 }
 
 /** `sources` are `{ src, title }`; untitled episodes are numbered. */
+/**
+ * What identifies an episode: its URL, or — when a source resolves the stream
+ * only at play time — the video it names. Progress is stored under this, so an
+ * episode whose URL differs on every play keeps its place. An episode that has
+ * a `src` returns exactly that, leaving everything already stored valid.
+ */
+export function episodeKey(episode) {
+  if (episode?.src) return episode.src
+  const stream = episode?.stream
+  return stream ? `stremio:${stream.pluginId}:${stream.videoId}` : ''
+}
+
 export function buildEpisodes(sources, offset = 0) {
   return sources.map((source, position) => ({
     id: crypto.randomUUID(),
     title: source.title?.trim() || `Episode ${offset + position + 1}`,
     src: source.src,
+    ...(source.stream ? { stream: source.stream } : {}),
     ...(source.subtitles?.length ? { subtitles: source.subtitles } : {}),
   }))
 }
@@ -187,15 +200,16 @@ export async function setEpisodes(movieId, sources) {
   const movie = findMovie(library, movieId)
   if (!movie) return library
 
-  const known = new Map(movie.episodes.map((episode) => [episode.src, episode]))
+  const known = new Map(movie.episodes.map((episode) => [episodeKey(episode), episode]))
   const episodes = sources.map((source, position) => {
-    const existing = known.get(source.src)
+    const existing = known.get(episodeKey(source))
     // A refresh that brings no subtitles keeps the ones already stored.
     const subtitles = source.subtitles?.length ? source.subtitles : existing?.subtitles
     return {
       id: existing?.id ?? crypto.randomUUID(),
       title: source.title?.trim() || existing?.title || `Episode ${position + 1}`,
       src: source.src,
+      ...(source.stream ? { stream: source.stream } : {}),
       ...(subtitles?.length ? { subtitles } : {}),
     }
   })
@@ -233,7 +247,7 @@ function watchedAt(movie, positions) {
   const stamped = Math.max(movie.lastPlayedAt ?? 0, movie.watchedAt ?? 0)
   if (stamped) return stamped
   const fromProgress = movie.episodes.reduce(
-    (latest, episode) => Math.max(latest, positions[episode.src]?.updatedAt ?? 0),
+    (latest, episode) => Math.max(latest, positions[episodeKey(episode)]?.updatedAt ?? 0),
     0,
   )
   return fromProgress || movie.addedAt || 0
@@ -277,7 +291,7 @@ export async function markWatched(movieId, watched = true) {
   const movie = findMovie(library, movieId)
   if (!movie) return library
 
-  if (watched) await clearProgressFor(movie.episodes.map((episode) => episode.src))
+  if (watched) await clearProgressFor(movie.episodes.map(episodeKey))
 
   return saveLibrary({
     movies: library.movies.map((item) =>

@@ -28,6 +28,7 @@ import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
 import {
   addMovie,
   EMPTY_LIBRARY,
+  episodeKey,
   findEpisode,
   findMovie,
   getLibrary,
@@ -74,7 +75,7 @@ function MovieCard({
   const resumeEpisode = movie.episodes[resumeIndex]
   const started = Boolean(movie.lastEpisodeId)
   const watched = Boolean(movie.watchedAt)
-  const percent = resumeEpisode ? percentOf(positions[resumeEpisode.src]) : null
+  const percent = resumeEpisode ? percentOf(positions[episodeKey(resumeEpisode)]) : null
 
   return (
     <article className="border-line bg-panel flex flex-col overflow-hidden rounded-md border">
@@ -370,7 +371,11 @@ export default function Gallery() {
         referer: plugin.referer,
         adPattern: plugin.adPattern,
         episodes,
-        source: { pluginId: plugin.id, itemId: result.id },
+        source: {
+          pluginId: plugin.id,
+          itemId: result.id,
+          ...(result.type ? { type: result.type } : {}),
+        },
       })
       await refresh()
     } catch (error) {
@@ -531,7 +536,7 @@ export default function Gallery() {
             <ContinueWatching
               movie={lastMovie}
               episode={lastEpisode}
-              progress={positions[lastEpisode.src]}
+              progress={positions[episodeKey(lastEpisode)]}
               onPlay={play}
             />
           )}

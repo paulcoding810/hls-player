@@ -26,6 +26,8 @@ import {
   warnBannerClass,
 } from '@components/ui'
 import { GALLERY_PATH, MESSAGE, PLAYBACK_RATES } from '@/helper/constants'
+import { getPlugins } from '@/helper/plugins'
+import { resolveStream } from '@/helper/stremio'
 import {
   addMovie,
   EMPTY_LIBRARY,
@@ -33,6 +35,7 @@ import {
   findMovie,
   getLibrary,
   resolveConfig,
+  episodeKey,
   resumeEpisodeId,
   setEpisodes,
   setLastPlayed,
@@ -123,6 +126,8 @@ export default function Player() {
   const playerRef = useRef(null)
   /** Movie config merged over the global settings, for the video callbacks. */
   const configRef = useRef(resolveConfig(null, DEFAULT_SETTINGS))
+  /** Addons resolve a URL per play, which takes a moment worth showing. */
+  const [resolving, setResolving] = useState(false)
   /** Whether a track has been turned on for this source already. */
   const chosenTrackRef = useRef(false)
   /** The tracks this page added and their blobs, dropped when the source changes. */
@@ -477,7 +482,9 @@ export default function Player() {
     let cancelled = false
 
     ;(async () => {
-      srcRef.current = source.src
+      // Progress is stored under this, not the URL: an addon hands out a
+      // different one on every play.
+      srcRef.current = episodeKey(source)
       savedAtRef.current = 0
       skippedRef.current = false
       chosenTrackRef.current = false
@@ -489,8 +496,34 @@ export default function Player() {
       setError('')
       setLevels([])
       setLevel('auto')
+      setResolving(false)
+
+      // An episode that names a video rather than a URL is resolved now, and
+      // the addon may supply the `Referer` its stream wants.
+      let playUrl = source.src
+      let referer = configRef.current.referer
+
+      if (source.stream) {
+        setResolving(true)
+        try {
+          const plugins = await getPlugins()
+          const plugin = plugins.find((item) => item.id === source.stream.pluginId)
+          if (!plugin) throw new Error('The source this episode came from is gone.')
+
+          const found = await resolveStream(plugin, source.stream)
+          playUrl = found.url
+          referer = found.referer || referer
+        } catch (streamError) {
+          if (!cancelled) setError(streamError.message)
+          return
+        } finally {
+          if (!cancelled) setResolving(false)
+        }
+      }
+      if (cancelled) return
+
       try {
-        await applyHeaders(configRef.current.referer)
+        await applyHeaders(referer)
       } catch (headerError) {
         setError(headerError.message)
         return
@@ -500,12 +533,12 @@ export default function Player() {
       const instance = playerRef.current
       if (!instance) return
 
-      const stored = await getProgress(source.src)
+      const stored = await getProgress(srcRef.current)
       if (cancelled) return
 
       const { autoplay, muted, playbackRate, volume } = configRef.current
       holdRef.current = Boolean(stored)
-      instance.src({ src: source.src, type: manifestMime(source.src) })
+      instance.src({ src: playUrl, type: manifestMime(playUrl) })
       loadSubtitles(instance, source.subtitles)
       instance.volume(volume)
       instance.muted(Boolean(muted))
@@ -994,7 +1027,15 @@ export default function Player() {
               />
             )}
 
-            {source && !playing && (
+            {resolving && (
+              <div className="pointer-events-none absolute inset-0 grid place-items-center">
+                <p className="border-line text-ink rounded-md border bg-black/70 px-4 py-2 text-sm backdrop-blur-sm">
+                  Finding a stream…
+                </p>
+              </div>
+            )}
+
+            {source && !playing && !resolving && (
               <div className="pointer-events-none absolute inset-0 grid place-items-center">
                 <button
                   type="button"

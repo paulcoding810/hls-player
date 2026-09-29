@@ -11,6 +11,7 @@ import {
   labelClass,
 } from './ui'
 import { EMPTY_PLUGIN, pluginToJson, searchPlugin } from '@/helper/plugins'
+import { forgetManifest } from '@/helper/stremio'
 import { compilePattern } from '@/utils/playlist'
 
 const JSON_EXAMPLE = `{
@@ -73,7 +74,12 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
       setError('Give the source a name.')
       return
     }
-    if (!draft.search.url.trim().includes('{query}')) {
+    if (draft.kind === 'stremio') {
+      if (!draft.url.trim()) {
+        setError('Give the addon a manifest URL.')
+        return
+      }
+    } else if (!draft.search.url.trim().includes('{query}')) {
       setError('The search URL needs a {query} placeholder.')
       return
     }
@@ -136,6 +142,8 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
     setError('')
     setTest({ running: true })
     try {
+      // An edited URL must not be answered from the manifest read before it.
+      forgetManifest(draft)
       const results = await searchPlugin(draft, 'test')
       setTest({ results })
     } catch (testError) {
@@ -203,6 +211,16 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {modeSwitch}
 
+      <ModeSwitch
+        value={draft.kind}
+        onChange={(kind) => setDraft({ ...draft, kind })}
+        label="Source kind"
+        options={[
+          { value: 'json', label: 'Custom API' },
+          { value: 'stremio', label: 'Stremio addon' },
+        ]}
+      />
+
       <div>
         <label className={labelClass} htmlFor="plugin-name">
           Name
@@ -252,96 +270,118 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
         </p>
       </div>
 
-      <fieldset className="border-line flex flex-col gap-3 rounded-md border p-3">
-        <legend className="text-ink-muted px-1 text-[11px] font-medium tracking-wider uppercase">
-          Search
-        </legend>
-        <Field
-          id="plugin-search-url"
-          label="URL"
-          placeholder="https://api.example.com/search?q={query}&page={page}"
-          help="{query} is what was typed, percent-encoded. {page} counts from 1, for the More button."
-          value={draft.search.url}
-          onChange={(url) => section('search', { url })}
-        />
-        <Field
-          id="plugin-search-list"
-          label="Results path"
-          placeholder="data.items"
-          help="Where the array of results sits. Dots and [0] indices."
-          value={draft.search.list}
-          onChange={(list) => section('search', { list })}
-        />
-        <div className="grid grid-cols-3 gap-3">
-          <Field
-            id="plugin-search-id"
-            label="Id"
-            placeholder="vod_id"
-            value={draft.search.fields.id}
-            onChange={(id) => fields('search', { id })}
+      {draft.kind === 'stremio' ? (
+        <div>
+          <label className={labelClass} htmlFor="plugin-manifest">
+            Manifest URL
+          </label>
+          <input
+            id="plugin-manifest"
+            className={`${inputClass} font-mono text-xs`}
+            spellCheck="false"
+            placeholder="https://v3-cinemeta.strem.io/manifest.json"
+            value={draft.url}
+            onChange={(event) => setDraft({ ...draft, url: event.target.value })}
           />
-          <Field
-            id="plugin-search-title"
-            label="Title"
-            placeholder="vod_name"
-            value={draft.search.fields.title}
-            onChange={(title) => fields('search', { title })}
-          />
-          <Field
-            id="plugin-search-poster"
-            label="Poster"
-            placeholder="vod_pic"
-            value={draft.search.fields.poster}
-            onChange={(poster) => fields('search', { poster })}
-          />
+          <p className={helpClass}>
+            Searching uses the addon&apos;s catalogs; each episode&apos;s stream is resolved when
+            you play it. Torrent-only addons will not work — there is no client here.
+          </p>
         </div>
-      </fieldset>
+      ) : (
+        <>
+          <fieldset className="border-line flex flex-col gap-3 rounded-md border p-3">
+            <legend className="text-ink-muted px-1 text-[11px] font-medium tracking-wider uppercase">
+              Search
+            </legend>
+            <Field
+              id="plugin-search-url"
+              label="URL"
+              placeholder="https://api.example.com/search?q={query}&page={page}"
+              help="{query} is what was typed, percent-encoded. {page} counts from 1, for the More button."
+              value={draft.search.url}
+              onChange={(url) => section('search', { url })}
+            />
+            <Field
+              id="plugin-search-list"
+              label="Results path"
+              placeholder="data.items"
+              help="Where the array of results sits. Dots and [0] indices."
+              value={draft.search.list}
+              onChange={(list) => section('search', { list })}
+            />
+            <div className="grid grid-cols-3 gap-3">
+              <Field
+                id="plugin-search-id"
+                label="Id"
+                placeholder="vod_id"
+                value={draft.search.fields.id}
+                onChange={(id) => fields('search', { id })}
+              />
+              <Field
+                id="plugin-search-title"
+                label="Title"
+                placeholder="vod_name"
+                value={draft.search.fields.title}
+                onChange={(title) => fields('search', { title })}
+              />
+              <Field
+                id="plugin-search-poster"
+                label="Poster"
+                placeholder="vod_pic"
+                value={draft.search.fields.poster}
+                onChange={(poster) => fields('search', { poster })}
+              />
+            </div>
+          </fieldset>
 
-      <fieldset className="border-line flex flex-col gap-3 rounded-md border p-3">
-        <legend className="text-ink-muted px-1 text-[11px] font-medium tracking-wider uppercase">
-          Details
-        </legend>
-        <Field
-          id="plugin-details-url"
-          label="URL"
-          placeholder="https://api.example.com/detail/{id}"
-          help="{id} is the id extracted above."
-          value={draft.details.url}
-          onChange={(url) => section('details', { url })}
-        />
-        <Field
-          id="plugin-details-episodes"
-          label="Episodes path"
-          placeholder="data.play[0].list"
-          value={draft.details.episodes}
-          onChange={(episodes) => section('details', { episodes })}
-        />
-        <div className="grid grid-cols-3 gap-3">
-          <Field
-            id="plugin-details-title"
-            label="Episode title"
-            placeholder="name"
-            value={draft.details.fields.title}
-            onChange={(title) => fields('details', { title })}
-          />
-          <Field
-            id="plugin-details-src"
-            label="Episode URL"
-            placeholder="url"
-            help="A path, or a template. A value can be reshaped: {url|replace:a,b}"
-            value={draft.details.fields.src}
-            onChange={(src) => fields('details', { src })}
-          />
-          <Field
-            id="plugin-details-subtitles"
-            label="Subtitles"
-            placeholder="subs"
-            help="Optional. One URL, or a list of them."
-            value={draft.details.fields.subtitles ?? ''}
-            onChange={(subtitles) => fields('details', { subtitles })}
-          />
-        </div>
-      </fieldset>
+          <fieldset className="border-line flex flex-col gap-3 rounded-md border p-3">
+            <legend className="text-ink-muted px-1 text-[11px] font-medium tracking-wider uppercase">
+              Details
+            </legend>
+            <Field
+              id="plugin-details-url"
+              label="URL"
+              placeholder="https://api.example.com/detail/{id}"
+              help="{id} is the id extracted above."
+              value={draft.details.url}
+              onChange={(url) => section('details', { url })}
+            />
+            <Field
+              id="plugin-details-episodes"
+              label="Episodes path"
+              placeholder="data.play[0].list"
+              value={draft.details.episodes}
+              onChange={(episodes) => section('details', { episodes })}
+            />
+            <div className="grid grid-cols-3 gap-3">
+              <Field
+                id="plugin-details-title"
+                label="Episode title"
+                placeholder="name"
+                value={draft.details.fields.title}
+                onChange={(title) => fields('details', { title })}
+              />
+              <Field
+                id="plugin-details-src"
+                label="Episode URL"
+                placeholder="url"
+                help="A path, or a template. A value can be reshaped: {url|replace:a,b}"
+                value={draft.details.fields.src}
+                onChange={(src) => fields('details', { src })}
+              />
+              <Field
+                id="plugin-details-subtitles"
+                label="Subtitles"
+                placeholder="subs"
+                help="Optional. One URL, or a list of them."
+                value={draft.details.fields.subtitles ?? ''}
+                onChange={(subtitles) => fields('details', { subtitles })}
+              />
+            </div>
+          </fieldset>
+        </>
+      )}
 
       <label className={checkboxRowClass}>
         <input

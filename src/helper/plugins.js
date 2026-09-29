@@ -1,5 +1,6 @@
 import { pluginStorage } from '.'
 import { setEpisodes } from './library'
+import { fetchStremioEpisodes, searchStremio } from './stremio'
 import { fillTemplate, readPath } from '@/utils/jsonPath'
 import { readSubtitles } from '@/utils/subtitles'
 import { normalizeSource } from '@/utils/url'
@@ -12,6 +13,10 @@ import { normalizeSource } from '@/utils/url'
 export const EMPTY_PLUGIN = {
   name: '',
   enabled: true,
+  /** `json` describes an API with paths; `stremio` speaks the addon protocol. */
+  kind: 'json',
+  /** A Stremio addon's manifest URL; unused by a `json` source. */
+  url: '',
   /** Both inherited by movies added from this source, for playback. */
   referer: '',
   adPattern: '',
@@ -61,6 +66,8 @@ export function pluginToJson(plugin) {
   return JSON.stringify(
     {
       name: plugin.name,
+      kind: plugin.kind === 'stremio' ? 'stremio' : undefined,
+      url: plugin.url || undefined,
       referer: plugin.referer || undefined,
       adPattern: plugin.adPattern || undefined,
       // Only worth stating when it is not the default.
@@ -77,7 +84,7 @@ function text(value) {
   return typeof value === 'string' || typeof value === 'number' ? String(value).trim() : ''
 }
 
-async function fetchJson(url, label) {
+export async function fetchJson(url, label) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT)
   try {
@@ -131,6 +138,8 @@ function extract(entry, fields) {
 
 /** `page` is 1-based; a URL without `{page}` simply ignores it. */
 export async function searchPlugin(plugin, query, page = 1) {
+  if (plugin.kind === 'stremio') return searchStremio(plugin, query)
+
   const url = fillTemplate(plugin.search?.url, { query, page })
   const payload = await fetchJson(url, plugin.name || 'The source')
 
@@ -144,6 +153,8 @@ export async function searchPlugin(plugin, query, page = 1) {
 
 /** Episodes for one search result, ready for `addMovie`/`setEpisodes`. */
 export async function fetchEpisodes(plugin, item) {
+  if (plugin.kind === 'stremio') return fetchStremioEpisodes(plugin, item)
+
   const url = fillTemplate(plugin.details?.url, item)
   const payload = await fetchJson(url, plugin.name || 'The source')
 
@@ -176,8 +187,10 @@ export async function searchAll(plugins, query) {
     enabled.map(async (plugin) => {
       try {
         const results = await searchPlugin(plugin, query)
-        // Nothing on page one means there is nothing to page through either.
-        return { plugin, results, error: '', page: 1, done: results.length === 0 }
+        // Nothing on page one means there is nothing to page through either,
+        // and the addon protocol has no paging at all.
+        const done = results.length === 0 || plugin.kind === 'stremio'
+        return { plugin, results, error: '', page: 1, done }
       } catch (error) {
         return { plugin, results: [], error: error.message, page: 1, done: true }
       }
@@ -210,7 +223,10 @@ export async function refreshMovie(movie, plugins) {
   const plugin = plugins.find((item) => item.id === movie.source?.pluginId)
   if (!plugin) throw new Error('The source this movie came from is gone.')
 
-  const episodes = await fetchEpisodes(plugin, { id: movie.source.itemId })
+  const episodes = await fetchEpisodes(plugin, {
+    id: movie.source.itemId,
+    type: movie.source.type,
+  })
   if (!episodes.length) throw new Error(`${plugin.name || 'The source'} returned no episodes.`)
 
   const known = new Set(movie.episodes.map((episode) => episode.src))

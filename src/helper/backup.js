@@ -53,10 +53,13 @@ function sanitizeMovie(raw) {
         id: string(episode?.id) || crypto.randomUUID(),
         title: string(episode?.title).trim() || `Episode ${position + 1}`,
         src: normalizeSource(episode?.src),
+        ...(sanitizeStream(episode?.stream) ? { stream: sanitizeStream(episode.stream) } : {}),
         ...(subtitles.length ? { subtitles } : {}),
       }
     })
-    .filter((episode) => episode.src)
+    // An episode resolved at play time carries no URL, so requiring one here
+    // would drop every Stremio episode on the way back in.
+    .filter((episode) => episode.src || episode.stream)
 
   // A movie with no playable episode is not worth importing.
   if (!episodes.length) return null
@@ -83,11 +86,20 @@ function sanitizeMovie(raw) {
   }
 }
 
+/** What an episode names when its URL is only resolved at play time. */
+function sanitizeStream(raw) {
+  const pluginId = string(raw?.pluginId)
+  const videoId = string(raw?.videoId)
+  const type = string(raw?.type) || 'movie'
+  return pluginId && videoId ? { pluginId, type, videoId } : null
+}
+
 /** The link back to a source plugin; anything malformed becomes "hand-made". */
 function sanitizeSource(raw) {
   const pluginId = string(raw?.pluginId)
   const itemId = string(raw?.itemId)
-  return pluginId && itemId ? { pluginId, itemId } : null
+  const type = string(raw?.type)
+  return pluginId && itemId ? { pluginId, itemId, ...(type ? { type } : {}) } : null
 }
 
 function sanitizeProgress(raw) {
@@ -123,6 +135,8 @@ function sanitizePlugin(raw) {
     enabled: raw.enabled !== false,
     referer: string(raw.referer),
     adPattern: string(raw.adPattern).trim(),
+    kind: raw.kind === 'stremio' ? 'stremio' : 'json',
+    url: string(raw.url).trim(),
     search: part('search', 'list'),
     details: part('details', 'episodes'),
   }
