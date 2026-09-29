@@ -10,16 +10,18 @@ Navigations to a `.m3u8`/`.mpd` path are taken over in `src/background/index.js`
 the library — the `grabbed`/`source` branch in `Player.jsx`, where `movie` stays null and the
 global settings supply the config.
 
-Two pages: `gallery.html` (`src/gallery/Gallery.jsx`) manages the library, `player.html`
+Three pages: `home.html` (`src/home/Home.jsx`) is the library and filters it, `catalog.html`
+(`src/catalog/Catalog.jsx`) searches and browses the Stremio sources and is the only place movies
+are added from one, and `player.html`
 (`src/player/Player.jsx`) plays what its own query string names —
 `?movie=<id>&episode=<id|1-based index>`, or `?src=<url>` for a grabbed link — and sends you back to
-the gallery when neither resolves. There is no router: the pages hand off by navigating to a URL
+the library page when neither resolves. There is no router: the pages hand off by navigating to a URL
 built with `playerUrlForEpisode()`/`playerUrlFor()` in `src/helper/player.js`. `lastPlayed` in
-storage is the fallback for a bare `player.html` and what the gallery's Continue watching panel
+storage is the fallback for a bare `player.html` and what the library page's Continue watching panel
 reads; the player rewrites its own URL with `replaceState` when the episode changes. The toolbar
-icon (`openGallery()`) always lands on the gallery. The data model lives in `src/helper/library.js` — `parseMovieJson()` there reads that same
+icon (`openHome()`) always lands on the library page. The data model lives in `src/helper/library.js` — `parseMovieJson()` there reads that same
 shape back from pasted text for the form's JSON mode. A library holds
-movies, a movie holds episodes plus its own config, and it carries three timestamps the gallery's
+movies, a movie holds episodes plus its own config, and it carries three timestamps the library page's
 `sortMovies()` reads — `addedAt`, `updatedAt` (stamped by `updateMovie`) and `lastPlayedAt`
 (stamped by `setLastPlayed`); sorting never rewrites the stored order. Blank config fields (`referer: ''`,
 `skipLeading/skipTrailing: null`) inherit from the global settings via `resolveConfig`. Playback
@@ -33,7 +35,7 @@ episode's identity and the key progress is stored under. `kind` carries its one 
 it is what lets a source stored before the custom-API kind was removed, or imported from an older
 export, be recognised and dropped. A plugin also carries the site's `referer` and `adPattern`,
 copied onto each movie it adds rather than looked up later. A movie added from one carries
-`source: { pluginId, itemId, type }`, which is what the gallery's refresh button uses to re-read
+`source: { pluginId, itemId, type }`, which is what the library page's refresh button uses to re-read
 episodes through the existing `setEpisodes`. All three stores,
 plus the settings, round-trip through `src/helper/backup.js` — `readBackup` sanitizes an untrusted
 file and `applyBackup` merges it by movie id, behind the Data section of the options page.

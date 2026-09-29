@@ -1,4 +1,4 @@
-import { GALLERY_PATH, PLAYER_PATH } from './constants'
+import { HOME_PATH, PLAYER_PATH } from './constants'
 import api from '@/utils/api'
 
 const TAB_KEY = 'playerTabId'
@@ -24,7 +24,7 @@ export function openOptions() {
  * The library is the way in — it carries a Continue watching section for
  * whatever was playing last. Focuses the existing tab when there is one.
  */
-export async function openGallery() {
+export async function openHome() {
   const stored = await session.get(TAB_KEY)
   const tabId = stored?.[TAB_KEY]
 
@@ -39,7 +39,7 @@ export async function openGallery() {
     }
   }
 
-  const tab = await api.tabs.create({ url: api.runtime.getURL(GALLERY_PATH) })
+  const tab = await api.tabs.create({ url: api.runtime.getURL(HOME_PATH) })
   await session.set({ [TAB_KEY]: tab.id })
   return tab
 }

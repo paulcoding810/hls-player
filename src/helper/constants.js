@@ -32,4 +32,6 @@ export const SUBTITLE_POSITIONS = [
 
 export const PLAYER_PATH = 'player.html'
 
-export const GALLERY_PATH = 'gallery.html'
+export const HOME_PATH = 'home.html'
+
+export const CATALOG_PATH = 'catalog.html'

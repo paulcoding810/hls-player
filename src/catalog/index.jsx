@@ -2,10 +2,10 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 
 import '../index.css'
-import Gallery from './Gallery'
+import Catalog from './Catalog'
 
 ReactDOM.createRoot(document.getElementById('app')).render(
   <React.StrictMode>
-    <Gallery />
+    <Catalog />
   </React.StrictMode>,
 )

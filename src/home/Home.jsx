@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 
 import ConfirmDialog from '@components/ConfirmDialog'
 import MovieForm from '@components/MovieForm'
-import SearchResults from '@components/SearchResults'
 import Toast from '@components/Toast'
 import {
   CheckIcon,
@@ -23,7 +22,7 @@ import {
   inputClass,
   selectClass,
 } from '@components/ui'
-import { SORT_ORDERS } from '@/helper/constants'
+import { CATALOG_PATH, SORT_ORDERS } from '@/helper/constants'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
 import {
   addMovie,
@@ -34,7 +33,6 @@ import {
   getLibrary,
   removeMovie,
   markWatched,
-  movieToJson,
   resumeEpisodeId,
   setEpisodes,
   sortMovies,
@@ -42,8 +40,7 @@ import {
 } from '@/helper/library'
 import { openOptions, playerUrlForEpisode } from '@/helper/player'
 import { addMovie as addLibraryMovie } from '@/helper/library'
-import { getPlugins, refreshMovie, searchAll } from '@/helper/plugins'
-import { fetchStremioEpisodes } from '@/helper/stremio'
+import { getPlugins, refreshMovie } from '@/helper/plugins'
 import { getAllProgress } from '@/helper/progress'
 import { formatTime } from '@/utils/time'
 
@@ -212,7 +209,7 @@ function ContinueWatching({ movie, episode, progress, onPlay }) {
   )
 }
 
-export default function Gallery() {
+export default function Home() {
   const [library, setLibrary] = useState(EMPTY_LIBRARY)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   /** A movie id, or `new` while adding one. */
@@ -225,12 +222,8 @@ export default function Gallery() {
   const [plugins, setPlugins] = useState([])
   const [query, setQuery] = useState('')
   /** Null until a search has run; then one group per enabled source. */
-  const [groups, setGroups] = useState(null)
-  const [searching, setSearching] = useState(false)
-  /** `pluginId:itemId` of the result being added, and a page-level error. */
+  /** Movie id whose refresh is in flight. */
   const [adding, setAdding] = useState('')
-  /** `pluginId:itemId` of the result being copied. */
-  const [copying, setCopying] = useState('')
   /** `{ tone, message }`; errors are `danger`, confirmations `warn`. */
   const [notice, setNotice] = useState(null)
 
@@ -278,91 +271,6 @@ export default function Gallery() {
 
   const refresh = async () => setLibrary(await getLibrary())
 
-  /** Results already in the library, keyed so they offer Watch instead of Add. */
-  const added = useMemo(
-    () =>
-      new Map(
-        library.movies
-          .filter((movie) => movie.source)
-          .map((movie) => [`${movie.source.pluginId}:${movie.source.itemId}`, movie]),
-      ),
-    [library.movies],
-  )
-
-  const runSearch = async (event) => {
-    event.preventDefault()
-    const term = query.trim()
-    if (!term) {
-      setGroups(null)
-      return
-    }
-
-    setNotice(null)
-    setSearching(true)
-    try {
-      setGroups(await searchAll(plugins, term))
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  /** The same JSON the Add movie form's Paste JSON mode reads back. */
-  const copyResult = async (plugin, result) => {
-    const key = `${plugin.id}:${result.id}`
-    setCopying(key)
-    setNotice(null)
-    try {
-      const episodes = await fetchStremioEpisodes(plugin, result)
-      if (!episodes.length) throw new Error(`${plugin.name} returned no episodes for this title.`)
-
-      await navigator.clipboard.writeText(
-        movieToJson({
-          title: result.title,
-          poster: result.poster,
-          referer: plugin.referer,
-          adPattern: plugin.adPattern,
-          episodes,
-        }),
-      )
-      setNotice({
-        tone: 'warn',
-        message: `Copied “${result.title}” as JSON — ${episodes.length} episode(s).`,
-      })
-    } catch (error) {
-      setNotice({ tone: 'danger', message: `Could not copy: ${error.message}` })
-    } finally {
-      setCopying('')
-    }
-  }
-
-  const addResult = async (plugin, result) => {
-    const key = `${plugin.id}:${result.id}`
-    setAdding(key)
-    setNotice(null)
-    try {
-      const episodes = await fetchStremioEpisodes(plugin, result)
-      if (!episodes.length) throw new Error(`${plugin.name} returned no episodes for this title.`)
-
-      await addLibraryMovie({
-        title: result.title,
-        poster: result.poster,
-        referer: plugin.referer,
-        adPattern: plugin.adPattern,
-        episodes,
-        source: {
-          pluginId: plugin.id,
-          itemId: result.id,
-          ...(result.type ? { type: result.type } : {}),
-        },
-      })
-      await refresh()
-    } catch (error) {
-      setNotice({ tone: 'danger', message: error.message })
-    } finally {
-      setAdding('')
-    }
-  }
-
   const handleWatched = async (movie) => {
     setLibrary(await markWatched(movie.id, !movie.watchedAt))
     setPositions(await getAllProgress())
@@ -409,10 +317,16 @@ export default function Gallery() {
       <header className="mb-6 flex items-center gap-3">
         <img src="/img/logo-32.png" alt="" className="h-6 w-6" />
         <h1 className="text-base font-semibold">Library</h1>
+        {sources && (
+          <a href={CATALOG_PATH} className={`${ghostButtonClass} ml-auto`}>
+            <SearchIcon className="h-3.5 w-3.5" />
+            Browse sources
+          </a>
+        )}
         <button
           type="button"
           onClick={() => setEditing('new')}
-          className={`${ghostButtonClass} ml-auto`}
+          className={`${ghostButtonClass} ${sources ? '' : 'ml-auto'}`}
         >
           <PlusIcon />
           Add movie
@@ -448,114 +362,78 @@ export default function Gallery() {
       </header>
 
       {(library.movies.length > 0 || sources) && (
-        <form onSubmit={runSearch} className="mb-6 flex items-center gap-2">
+        <div className="mb-6 flex items-center gap-2">
           <div className="relative flex-1">
             <input
               type="search"
               value={query}
-              onChange={(event) => {
-                setQuery(event.target.value)
-                // Typing goes back to filtering the library; Enter searches again.
-                setGroups(null)
-              }}
-              placeholder={
-                sources
-                  ? 'Filter the library, or press Enter to search sources…'
-                  : 'Filter the library…'
-              }
-              aria-label="Filter the library, or search sources"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Filter the library…"
+              aria-label="Filter the library"
               className={`${inputClass} pr-9`}
             />
             {query && (
               <button
                 type="button"
-                onClick={() => {
-                  setQuery('')
-                  setGroups(null)
-                  setNotice(null)
-                }}
+                onClick={() => setQuery('')}
                 className={`${iconButtonClass} absolute inset-y-0 right-1 my-auto`}
-                aria-label="Clear the search"
+                aria-label="Clear the filter"
                 title="Clear"
               >
                 <CloseIcon />
               </button>
             )}
           </div>
-          <button
-            type="submit"
-            disabled={!query.trim() || !sources}
-            title={sources ? 'Search your sources' : 'Add a source on the options page first'}
-            className={ghostButtonClass}
-          >
-            <SearchIcon className="h-3.5 w-3.5" />
-            Search
-          </button>
-        </form>
+        </div>
       )}
 
       <Toast notice={notice} onDismiss={() => setNotice(null)} />
 
-      {groups !== null ? (
-        <SearchResults
-          groups={groups}
-          busy={searching}
-          added={added}
-          adding={adding}
-          onAdd={addResult}
-          onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
-          onCopy={copyResult}
-          copying={copying}
+      {!term && lastMovie && lastEpisode && (
+        <ContinueWatching
+          movie={lastMovie}
+          episode={lastEpisode}
+          progress={positions[episodeKey(lastEpisode)]}
+          onPlay={play}
         />
-      ) : (
-        <>
-          {!term && lastMovie && lastEpisode && (
-            <ContinueWatching
-              movie={lastMovie}
-              episode={lastEpisode}
-              progress={positions[episodeKey(lastEpisode)]}
-              onPlay={play}
-            />
-          )}
+      )}
 
-          {library.movies.length === 0 ? (
-            <div className="text-ink-faint flex flex-1 flex-col items-center justify-center gap-3">
-              <FilmIcon className="h-10 w-10" />
-              <p className="text-sm">No movies yet.</p>
-              <button type="button" onClick={() => setEditing('new')} className={buttonClass}>
-                <PlusIcon />
-                Add your first movie
-              </button>
-            </div>
-          ) : shown.length === 0 ? (
-            <div className="text-ink-faint flex flex-1 flex-col items-center justify-center gap-3">
-              <FilmIcon className="h-10 w-10" />
-              <p className="text-sm">Nothing in the library matches “{query.trim()}”.</p>
-              {sources && (
-                <button type="button" onClick={runSearch} className={ghostButtonClass}>
-                  <SearchIcon className="h-3.5 w-3.5" />
-                  Search your sources for it
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 content-start gap-4 sm:grid-cols-3 md:grid-cols-4">
-              {shown.map((movie) => (
-                <MovieCard
-                  key={movie.id}
-                  movie={movie}
-                  positions={positions}
-                  onPlay={play}
-                  onEdit={setEditing}
-                  onDelete={setDeleting}
-                  onRefresh={handleRefresh}
-                  onWatched={handleWatched}
-                  refreshing={adding === movie.id}
-                />
-              ))}
-            </div>
+      {library.movies.length === 0 ? (
+        <div className="text-ink-faint flex flex-1 flex-col items-center justify-center gap-3">
+          <FilmIcon className="h-10 w-10" />
+          <p className="text-sm">No movies yet.</p>
+          <button type="button" onClick={() => setEditing('new')} className={buttonClass}>
+            <PlusIcon />
+            Add your first movie
+          </button>
+        </div>
+      ) : shown.length === 0 ? (
+        <div className="text-ink-faint flex flex-1 flex-col items-center justify-center gap-3">
+          <FilmIcon className="h-10 w-10" />
+          <p className="text-sm">Nothing in the library matches “{query.trim()}”.</p>
+          {sources && (
+            <a href={CATALOG_PATH} className={ghostButtonClass}>
+              <SearchIcon className="h-3.5 w-3.5" />
+              Look for it in your sources
+            </a>
           )}
-        </>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 content-start gap-4 sm:grid-cols-3 md:grid-cols-4">
+          {shown.map((movie) => (
+            <MovieCard
+              key={movie.id}
+              movie={movie}
+              positions={positions}
+              onPlay={play}
+              onEdit={setEditing}
+              onDelete={setDeleting}
+              onRefresh={handleRefresh}
+              onWatched={handleWatched}
+              refreshing={adding === movie.id}
+            />
+          ))}
+        </div>
       )}
 
       {editing && (

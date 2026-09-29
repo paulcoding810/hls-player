@@ -67,10 +67,55 @@ export function forgetManifest(plugin) {
   manifests.delete(baseOf(plugin))
 }
 
-function searchable(manifest) {
-  return (manifest?.catalogs ?? []).filter((catalog) =>
-    (catalog.extra ?? []).some((extra) => extra?.name === 'search'),
+/** One result row, shared by searching and browsing. */
+function toResult(meta, plugin) {
+  return {
+    id: meta.id,
+    title: meta.name,
+    poster: normalizeSource(meta.poster) ?? '',
+    type: meta.type || 'movie',
+    plugin,
+  }
+}
+
+function hasExtra(catalog, name) {
+  return (catalog?.extra ?? []).some((extra) => extra?.name === name)
+}
+
+/** Every catalog an addon publishes, for the browse picker. */
+export async function listCatalogs(plugin) {
+  const manifest = await readManifest(plugin)
+
+  return (manifest?.catalogs ?? [])
+    .filter((catalog) => catalog?.type && catalog?.id)
+    .map((catalog) => ({
+      type: catalog.type,
+      id: catalog.id,
+      name: catalog.name || catalog.id,
+      /** Only a catalog that declares `skip` can be paged past its first page. */
+      pageable: hasExtra(catalog, 'skip'),
+    }))
+}
+
+/**
+ * One page of a catalog. `skip` counts items, not pages, and is left out
+ * entirely at the start — some addons answer a bare path but not `skip=0`.
+ */
+export async function browseCatalog(plugin, catalog, skip = 0) {
+  const base = baseOf(plugin)
+  const path = skip > 0 ? `${catalog.id}/skip=${skip}` : catalog.id
+  const payload = await fetchJson(
+    `${base}/catalog/${catalog.type}/${path}.json`,
+    plugin.name || 'The addon',
   )
+
+  return (payload?.metas ?? [])
+    .filter((meta) => meta?.id && meta?.name)
+    .map((meta) => toResult({ ...meta, type: meta.type || catalog.type }, plugin))
+}
+
+function searchable(manifest) {
+  return (manifest?.catalogs ?? []).filter((catalog) => hasExtra(catalog, 'search'))
 }
 
 /**
@@ -101,13 +146,7 @@ export async function searchStremio(plugin, query) {
   return pages
     .flat()
     .filter((meta) => meta?.id && meta?.name && !seen.has(meta.id) && seen.add(meta.id))
-    .map((meta) => ({
-      id: meta.id,
-      title: meta.name,
-      poster: normalizeSource(meta.poster) ?? '',
-      type: meta.type || 'movie',
-      plugin,
-    }))
+    .map((meta) => toResult(meta, plugin))
 }
 
 /** `S1E2` when an episode has no title of its own. */

@@ -24,7 +24,7 @@ import {
 import { applyBackup, backupFileName, buildBackup, readBackup } from '@/helper/backup'
 import { clearLibrary, getLibrary } from '@/helper/library'
 import { addPlugin, getPlugins, pluginToJson, removePlugin, updatePlugin } from '@/helper/plugins'
-import { openGallery } from '@/helper/player'
+import { openHome } from '@/helper/player'
 import { DEFAULT_SETTINGS, getSettings, saveSettings } from '@/helper/settings'
 import api from '@/utils/api'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
@@ -151,7 +151,7 @@ export const Options = () => {
         <img src="/img/logo-32.png" alt="" className="h-6 w-6" />
         <h1 className="text-base font-semibold">HLS Player</h1>
         {VERSION && <span className="text-ink-faint text-xs">v{VERSION}</span>}
-        <button type="button" onClick={() => openGallery()} className={`${buttonClass} ml-auto`}>
+        <button type="button" onClick={() => openHome()} className={`${buttonClass} ml-auto`}>
           <LibraryIcon />
           Open library
         </button>

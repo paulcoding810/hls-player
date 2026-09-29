@@ -3,8 +3,10 @@ import assert from 'node:assert/strict'
 
 import { jsonReply, stubFetch, stubStorage } from './helpers.mjs'
 import {
+  browseCatalog,
   fetchStremioEpisodes,
   forgetManifest,
+  listCatalogs,
   resolveStream,
   searchStremio,
 } from '@/helper/stremio'
@@ -368,5 +370,74 @@ describe('a Stremio movie in the library', () => {
       videoId: 'tt1:1:1',
     })
     assert.equal(restored.source.type, 'series', 'refresh needs the type back')
+  })
+})
+
+describe('listCatalogs', () => {
+  it('lists every catalog, not only the searchable ones', async () => {
+    serve({
+      manifest: {
+        ...MANIFEST,
+        catalogs: [
+          { type: 'series', id: 'top', name: 'Top', extra: [{ name: 'search' }, { name: 'skip' }] },
+          { type: 'movie', id: 'featured', name: 'Featured' },
+        ],
+      },
+    })
+
+    const catalogs = await listCatalogs(ADDON)
+    assert.equal(catalogs.length, 2, 'browsing does not need a search extra')
+    assert.equal(catalogs[0].pageable, true, 'it declares skip')
+    assert.equal(catalogs[1].pageable, false)
+    assert.equal(catalogs[1].name, 'Featured')
+  })
+
+  it('names a catalog by its id when it has no name', async () => {
+    serve({ manifest: { ...MANIFEST, catalogs: [{ type: 'movie', id: 'top' }] } })
+    assert.equal((await listCatalogs(ADDON))[0].name, 'top')
+  })
+
+  it('drops a malformed catalog', async () => {
+    serve({ manifest: { ...MANIFEST, catalogs: [{ name: 'No type or id' }] } })
+    assert.deepEqual(await listCatalogs(ADDON), [])
+  })
+})
+
+describe('browseCatalog', () => {
+  const catalog = { type: 'series', id: 'top', name: 'Top', pageable: true }
+
+  it('asks for the bare path at the start', async () => {
+    const asked = serve({ catalog: { metas: [{ id: 'tt1', name: 'One' }] } })
+    await browseCatalog(ADDON, catalog)
+    // Some addons answer `/top.json` but not `/top/skip=0.json`.
+    assert.ok(asked.at(-1).endsWith('/catalog/series/top.json'), asked.at(-1))
+  })
+
+  it('asks for a skip on later pages', async () => {
+    const asked = serve({ catalog: { metas: [] } })
+    await browseCatalog(ADDON, catalog, 100)
+    assert.ok(asked.at(-1).endsWith('/catalog/series/top/skip=100.json'), asked.at(-1))
+  })
+
+  it('reads the metas into result rows', async () => {
+    serve({
+      catalog: { metas: [{ id: 'tt1', name: 'One', poster: 'https://p.test/1.jpg' }] },
+    })
+    const [result] = await browseCatalog(ADDON, catalog)
+    assert.deepEqual(
+      [result.id, result.title, result.poster, result.type],
+      ['tt1', 'One', 'https://p.test/1.jpg', 'series'],
+    )
+    assert.equal(result.plugin.id, 'p1', 'so Add knows which source to ask')
+  })
+
+  it('falls back to the catalog type when a meta omits one', async () => {
+    serve({ catalog: { metas: [{ id: 'tt1', name: 'One' }] } })
+    assert.equal((await browseCatalog(ADDON, catalog))[0].type, 'series')
+  })
+
+  it('drops a meta with no id or name', async () => {
+    serve({ catalog: { metas: [{ id: 'tt1' }, { name: 'No id' }, { id: 'tt2', name: 'Two' }] } })
+    assert.equal((await browseCatalog(ADDON, catalog)).length, 1)
   })
 })

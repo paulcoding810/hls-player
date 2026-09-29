@@ -25,7 +25,7 @@ import {
   overlayPlayButtonClass,
   warnBannerClass,
 } from '@components/ui'
-import { GALLERY_PATH, MESSAGE, PLAYBACK_RATES } from '@/helper/constants'
+import { HOME_PATH, MESSAGE, PLAYBACK_RATES } from '@/helper/constants'
 import { getPlugins } from '@/helper/plugins'
 import { resolveStream } from '@/helper/stremio'
 import {
@@ -395,7 +395,7 @@ export default function Player() {
 
       if (!asked || !episodeId) {
         // `replace`, so Back does not bounce straight back here.
-        window.location.replace(GALLERY_PATH)
+        window.location.replace(HOME_PATH)
         return
       }
 
@@ -579,7 +579,7 @@ export default function Player() {
     // The episode being watched was edited away.
     const fallback = resumeEpisodeId(movie)
     if (fallback) play(movie.id, fallback)
-    else window.location.href = GALLERY_PATH
+    else window.location.href = HOME_PATH
   }, [ready, watching?.movieId, movie, episode, play])
 
   const goToEpisode = useCallback(
@@ -673,7 +673,7 @@ export default function Player() {
       instance.pause()
       await saveProgress(srcRef.current, instance.currentTime(), instance.duration())
     }
-    window.location.href = GALLERY_PATH
+    window.location.href = HOME_PATH
   }, [])
 
   const toggleFullscreen = useCallback(() => {

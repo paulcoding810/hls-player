@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         // Neither page is reachable from the manifest — the extension opens them
         // itself — so both are declared as entry points.
-        input: { player: 'player.html', gallery: 'gallery.html' },
+        input: { player: 'player.html', home: 'home.html', catalog: 'catalog.html' },
         output: {
           chunkFileNames: 'assets/chunk-[hash].js',
         },

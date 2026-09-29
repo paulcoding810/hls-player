@@ -37,7 +37,7 @@ hls-player
 
 > A library of HLS (`.m3u8`) and DASH (`.mpd`) movies and series, played with a custom `Referer`.
 
-Clicking the toolbar icon opens the **library** (`gallery.html`) — there is no popup. A
+Clicking the toolbar icon opens the **library** (`home.html`) — there is no popup. A
 **Continue watching** panel sits above the grid with the movie and episode you were last on, how
 far in you were, and a button to pick it back up; playing anything from the library opens the
 player, and **Library** in the player header comes back. Streams play through [video.js](https://videojs.com/) — a URL ending in
@@ -150,11 +150,22 @@ form does. A bad field is reported by name rather than silently dropped.
 
 ## Sources
 
-A **source** is a [Stremio](https://www.stremio.com) addon, so the library can search it directly
-instead of you pasting every episode URL. Add one on the options page with its manifest URL —
-`https://v3-cinemeta.strem.io/manifest.json`, say — and the library's search bar queries every
-enabled source at once, grouping the results. A source that fails shows its error in its own group
-rather than taking the search down, and a result already in the library reads **Watch**.
+A **source** is a [Stremio](https://www.stremio.com) addon, so movies can be found rather than
+typed in. Add one on the options page with its manifest URL —
+`https://v3-cinemeta.strem.io/manifest.json`, say.
+
+Sources live on their own page, `catalog.html`, reached with **Browse sources** from the library.
+It does two things:
+
+- **Search** queries every enabled source at once and groups the results. A source that fails shows
+  its error in its own group rather than taking the search down.
+- **Browse** picks one of the catalogs a source publishes and lists it, with **More** where the
+  catalog declares it can be paged. A catalog that cannot be paged, or that returns a short page,
+  simply stops.
+
+Either way a result offers **Add**, **Watch** when it is already in the library, and a copy button
+for its JSON. The library page keeps only its own filter — typing there narrows what you already
+have and never reaches the network.
 
 Addons work in three steps, and the third is the one that shows: a catalog gives titles, a title
 gives _videos_, and the playable URL comes from a separate request made **when you press play**. So
