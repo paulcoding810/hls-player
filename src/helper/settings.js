@@ -22,6 +22,8 @@ export const DEFAULT_SETTINGS = {
   subtitleSize: 1,
   /** The shaded box behind the cue text. */
   subtitleBackground: true,
+  /** Rem above the bottom edge — one of `SUBTITLE_POSITIONS`. */
+  subtitlePosition: 4.5,
   playbackRate: 1,
   /** Skip the windows below without asking; off turns them into buttons. */
   autoSkip: true,
@@ -57,6 +59,7 @@ export function sanitizeSettings(settings) {
     subtitleLang: (settings.subtitleLang ?? '').trim().toLowerCase(),
     subtitleSize: clamp(settings.subtitleSize, 0.75, 2, 1),
     subtitleBackground: settings.subtitleBackground !== false,
+    subtitlePosition: clamp(settings.subtitlePosition, 1.5, 12, 4.5),
     autoSkip: Boolean(settings.autoSkip),
     grabLinks: Boolean(settings.grabLinks),
     playbackRate: Number(settings.playbackRate) > 0 ? Number(settings.playbackRate) : 1,

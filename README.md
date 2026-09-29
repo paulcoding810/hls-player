@@ -171,7 +171,11 @@ build below. Instead you say _where_ the values are:
   "details": {
     "url": "https://api.example.com/detail/{id}",
     "episodes": "data.play[0].list",
-    "fields": { "title": "name", "src": "https://cdn.example.com/{path}.m3u8" }
+    "fields": {
+      "title": "name",
+      "src": "https://cdn.example.com/{path}.m3u8",
+      "subtitle": "https://cdn.example.com/{path}.vtt"
+    }
   }
 }
 ```
@@ -313,15 +317,26 @@ The options page carries four settings for them:
 | Turn subtitles on when a stream has them | picks a track by itself, once per episode                                                  |
 | Preferred language                       | matched on the start of the track's language, so `en` finds `en-GB`; blank takes the first |
 | Size                                     | scales the cues from 0.75× to 2×                                                           |
+| Position                                 | how far the cues sit above the bottom edge                                                 |
 | Shaded box behind the text               | off replaces the box with an outline, for a lighter look over bright video                 |
 
 A track is chosen once per episode, so picking a different one from the menu is not undone
 mid-playback.
 
-**Size** and the **shaded box** are also reachable while watching, from the cog beside the
-subtitle menu in the control bar — they are the two worth changing against the video in front of
-you. They are the same global settings, so a change there shows on the options page and applies to
-every movie. The control bar stays up while that popover is open.
+The cog beside the subtitle menu opens the rest, against the video in front of you:
+
+- **Second subtitles** shows a second track at the same time, stacked above the first — for
+  watching with both the original and a translation. Its cues are lifted clear so the two do not
+  print on top of each other. This one is per-episode, not remembered.
+- **Timing** nudges the cues earlier or later in quarter-second steps, for a file that does not
+  line up with the audio. It applies to every track showing, and **Reset** puts them back — each
+  cue is set from the times it was born with rather than shifted from where it is now, so the
+  original is always recoverable.
+- **Size** and **Position** — how large the cues are, and how far above the control bar they sit.
+- **Shaded box** — off replaces the box with an outline.
+
+Size, position and the box are the same global settings the options page holds, so a change in
+either place shows in the other. The control bar stays up while the popover is open.
 
 Subtitles are lifted clear of the control bar by a fixed amount. video.js drops them almost to the
 bottom edge when its own skin is disabled, which is where our bar sits; lifting them only while the

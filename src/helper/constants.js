@@ -22,6 +22,14 @@ export const SUBTITLE_SIZES = [
   { value: 2, label: 'Largest' },
 ]
 
+/** How far the cues sit above the bottom edge, clear of the control bar. */
+export const SUBTITLE_POSITIONS = [
+  { value: 1.5, label: 'Low' },
+  { value: 4.5, label: 'Normal' },
+  { value: 8, label: 'High' },
+  { value: 12, label: 'Highest' },
+]
+
 export const PLAYER_PATH = 'player.html'
 
 export const GALLERY_PATH = 'gallery.html'

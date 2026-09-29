@@ -1,4 +1,4 @@
-import { PLAYBACK_RATES, SUBTITLE_SIZES } from '@/helper/constants'
+import { PLAYBACK_RATES, SUBTITLE_POSITIONS, SUBTITLE_SIZES } from '@/helper/constants'
 import { checkboxClass, checkboxRowClass, helpClass, inputClass, labelClass } from './ui'
 
 /** Controlled by the parent, which owns persistence. */
@@ -173,22 +173,43 @@ export default function SettingsPanel({ settings, onChange }) {
             </p>
           </div>
 
-          <div>
-            <label className={labelClass} htmlFor="subtitle-size">
-              Size
-            </label>
-            <select
-              id="subtitle-size"
-              className={inputClass}
-              value={settings.subtitleSize}
-              onChange={(event) => onChange({ subtitleSize: Number(event.target.value) })}
-            >
-              {SUBTITLE_SIZES.map((size) => (
-                <option key={size.value} value={size.value}>
-                  {size.label}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass} htmlFor="subtitle-size">
+                Size
+              </label>
+              <select
+                id="subtitle-size"
+                className={inputClass}
+                value={settings.subtitleSize}
+                onChange={(event) => onChange({ subtitleSize: Number(event.target.value) })}
+              >
+                {SUBTITLE_SIZES.map((size) => (
+                  <option key={size.value} value={size.value}>
+                    {size.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className={labelClass} htmlFor="subtitle-position">
+                Position
+              </label>
+              <select
+                id="subtitle-position"
+                className={inputClass}
+                value={settings.subtitlePosition}
+                onChange={(event) => onChange({ subtitlePosition: Number(event.target.value) })}
+              >
+                {SUBTITLE_POSITIONS.map((spot) => (
+                  <option key={spot.value} value={spot.value}>
+                    {spot.label}
+                  </option>
+                ))}
+              </select>
+              <p className={helpClass}>How far above the control bar.</p>
+            </div>
           </div>
         </div>
 

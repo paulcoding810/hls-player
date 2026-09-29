@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
   FullscreenExitIcon,
+  MinusIcon,
+  PlusIcon,
   SettingsIcon,
   FullscreenIcon,
   NextIcon,
@@ -11,8 +13,15 @@ import {
   VolumeIcon,
   VolumeMutedIcon,
 } from './icons'
-import { checkboxClass, checkboxRowClass, iconButtonClass, labelClass, selectClass } from './ui'
-import { PLAYBACK_RATES, SUBTITLE_SIZES } from '@/helper/constants'
+import {
+  checkboxClass,
+  checkboxRowClass,
+  iconButtonClass,
+  labelClass,
+  linkButtonClass,
+  selectClass,
+} from './ui'
+import { PLAYBACK_RATES, SUBTITLE_POSITIONS, SUBTITLE_SIZES } from '@/helper/constants'
 import { formatTime } from '@/utils/time'
 import './Controls.css'
 
@@ -51,6 +60,16 @@ function read(player) {
     rate: player.playbackRate(),
   }
 }
+
+/**
+ * Lines above the bottom for a second track's cues. The primary sits on the
+ * last line, so this clears a two-line cue beneath it.
+ */
+const SECOND_TRACK_LINE = -4
+
+/** Nudging subtitles into sync: a quarter of a second reads as one press. */
+const TIMING_STEP = 0.25
+const TIMING_LIMIT = 30
 
 /** Matches `.control-range`'s thumb in Controls.css. */
 const THUMB_SIZE = 12
@@ -92,6 +111,14 @@ export default function Controls({
   /** Subtitle and caption tracks the stream carries, and which is showing. */
   const [tracks, setTracks] = useState([])
   const [tuning, setTuning] = useState(false)
+  /** A second track shown at the same time, above the first. */
+  const [secondId, setSecondId] = useState('off')
+  /** Seconds the cues are shifted by; positive shows them later. */
+  const [offset, setOffset] = useState(0)
+  /** Each cue's own times, so an offset is always measured from the original. */
+  const cueTimes = useRef(new WeakMap())
+  /** What each track already carries, to skip tracks that need no work. */
+  const appliedOffset = useRef(new Map())
 
   useEffect(() => {
     if (!player) return
@@ -119,6 +146,11 @@ export default function Controls({
         })
       }
       setTracks(found)
+      // The next episode brings different tracks, so a second one chosen for
+      // the last is no longer in the list and must not linger in the menu.
+      setSecondId((current) =>
+        current === 'off' || found.some((entry) => entry.id === current) ? current : 'off',
+      )
     }
 
     list.addEventListener('addtrack', sync)
@@ -132,6 +164,86 @@ export default function Controls({
       list.removeEventListener('change', sync)
     }
   }, [player])
+
+  /**
+   * A second track's cues default to the last line, exactly where the first
+   * one sits. Lifting them stacks the pair rather than printing them on top of
+   * each other.
+   */
+  useEffect(() => {
+    const track = tracks.find((entry) => entry.id === secondId)?.track
+    if (!track) return undefined
+
+    const lift = () => {
+      const cues = track.cues
+      if (!cues || !cues.length) return false
+      for (let index = 0; index < cues.length; index += 1) {
+        cues[index].snapToLines = true
+        cues[index].line = SECOND_TRACK_LINE
+      }
+      return true
+    }
+
+    // Putting the line back matters when this track is later promoted to the
+    // first one: cues left at -4 would render high up the frame.
+    const restore = () => {
+      const cues = track.cues
+      for (let index = 0; index < (cues?.length ?? 0); index += 1) cues[index].line = 'auto'
+    }
+
+    // Cues only load once a track is showing, so the first attempt often finds
+    // none and the first `cuechange` is when they are all there.
+    if (lift()) return restore
+
+    const retry = () => {
+      if (lift()) track.removeEventListener('cuechange', retry)
+    }
+    track.addEventListener('cuechange', retry)
+    return () => {
+      track.removeEventListener('cuechange', retry)
+      restore()
+    }
+  }, [tracks, secondId])
+
+  /**
+   * Subtitles running ahead of or behind the audio are fixed by moving the cues
+   * themselves — the only timing a text track exposes. Every cue is set from
+   * the times it was born with rather than nudged from where it is now: a cue
+   * near the start clamps at zero, and adding the difference back would not
+   * return it to where it began. A track whose cues arrive later is caught by
+   * its own `cuechange`.
+   */
+  useEffect(() => {
+    const applied = appliedOffset.current
+    const original = cueTimes.current
+
+    const sync = () => {
+      tracks.forEach(({ track }) => {
+        const cues = track.cues
+        if (!cues || !cues.length) return
+        if (applied.get(track) === offset) return
+
+        for (let index = 0; index < cues.length; index += 1) {
+          const cue = cues[index]
+          let born = original.get(cue)
+          if (!born) {
+            born = { startTime: cue.startTime, endTime: cue.endTime }
+            original.set(cue, born)
+          }
+          cue.startTime = Math.max(0, born.startTime + offset)
+          cue.endTime = Math.max(0, born.endTime + offset)
+        }
+        applied.set(track, offset)
+      })
+    }
+
+    sync()
+    const detach = tracks.map(({ track }) => {
+      track.addEventListener('cuechange', sync)
+      return () => track.removeEventListener('cuechange', sync)
+    })
+    return () => detach.forEach((off) => off())
+  }, [offset, tracks])
 
   if (!player) return null
 
@@ -178,15 +290,35 @@ export default function Controls({
     setHover(ratio)
   }
 
-  const showing = tracks.find((entry) => entry.track.mode === 'showing')
+  const second = tracks.find((entry) => entry.id === secondId)
+  const showing = tracks.find((entry) => entry.track.mode === 'showing' && entry.id !== secondId)
 
-  /** One track at a time, so picking a second turns the first off. */
-  const chooseTrack = (id) => {
+  const apply = (primary, secondary) => {
     tracks.forEach((entry) => {
-      entry.track.mode = entry.id === id ? 'showing' : 'disabled'
+      const wanted = entry.id === primary || (secondary !== 'off' && entry.id === secondary)
+      entry.track.mode = wanted ? 'showing' : 'disabled'
     })
     // `change` does not fire for every engine, so the list is re-read here too.
     setTracks((current) => [...current])
+  }
+
+  const chooseTrack = (id) => {
+    // Picking the second track as the first leaves nothing stacked above it.
+    if (id === secondId) setSecondId('off')
+    apply(id, id === secondId ? 'off' : secondId)
+  }
+
+  /** Rounded to the step, so repeated presses cannot drift off it. */
+  const nudge = (delta) => {
+    setOffset((current) => {
+      const next = Math.round((current + delta) / TIMING_STEP) * TIMING_STEP
+      return Math.min(TIMING_LIMIT, Math.max(-TIMING_LIMIT, next))
+    })
+  }
+
+  const chooseSecond = (id) => {
+    setSecondId(id)
+    apply(showing?.id ?? 'off', id)
   }
 
   const cancelSeek = () => {
@@ -311,25 +443,108 @@ export default function Controls({
           {tracks.length > 0 && (
             <div className="relative flex items-center gap-1">
               {tuning && (
-                <div className="border-line bg-panel/95 absolute right-0 bottom-full mb-2 flex w-56 flex-col gap-3 rounded-md border p-3 backdrop-blur-sm">
+                <div className="border-line bg-panel/95 absolute right-0 bottom-full mb-2 flex w-64 flex-col gap-3 rounded-md border p-3 backdrop-blur-sm">
+                  {tracks.length > 1 && (
+                    <div>
+                      <label className={labelClass} htmlFor="subtitle-second">
+                        Second subtitles
+                      </label>
+                      <select
+                        id="subtitle-second"
+                        className={selectClass}
+                        value={secondId}
+                        onChange={(event) => chooseSecond(event.target.value)}
+                      >
+                        <option value="off">None</option>
+                        {tracks
+                          .filter((entry) => entry.id !== showing?.id)
+                          .map((entry) => (
+                            <option key={entry.id} value={entry.id}>
+                              {entry.label}
+                            </option>
+                          ))}
+                      </select>
+                      <p className="text-ink-faint mt-1 text-xs">Shown above the first.</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelClass} htmlFor="subtitle-scale">
+                        Size
+                      </label>
+                      <select
+                        id="subtitle-scale"
+                        className={selectClass}
+                        value={subtitleSettings?.subtitleSize ?? 1}
+                        onChange={(event) =>
+                          onSubtitleSettings?.({ subtitleSize: Number(event.target.value) })
+                        }
+                      >
+                        {SUBTITLE_SIZES.map((size) => (
+                          <option key={size.value} value={size.value}>
+                            {size.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className={labelClass} htmlFor="subtitle-position">
+                        Position
+                      </label>
+                      <select
+                        id="subtitle-position"
+                        className={selectClass}
+                        value={subtitleSettings?.subtitlePosition ?? 4.5}
+                        onChange={(event) =>
+                          onSubtitleSettings?.({ subtitlePosition: Number(event.target.value) })
+                        }
+                      >
+                        {SUBTITLE_POSITIONS.map((spot) => (
+                          <option key={spot.value} value={spot.value}>
+                            {spot.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
                   <div>
-                    <label className={labelClass} htmlFor="subtitle-scale">
-                      Subtitle size
-                    </label>
-                    <select
-                      id="subtitle-scale"
-                      className={selectClass}
-                      value={subtitleSettings?.subtitleSize ?? 1}
-                      onChange={(event) =>
-                        onSubtitleSettings?.({ subtitleSize: Number(event.target.value) })
-                      }
-                    >
-                      {SUBTITLE_SIZES.map((size) => (
-                        <option key={size.value} value={size.value}>
-                          {size.label}
-                        </option>
-                      ))}
-                    </select>
+                    <span className={labelClass}>Timing</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => nudge(-TIMING_STEP)}
+                        className={iconButtonClass}
+                        aria-label="Show subtitles earlier"
+                        title="Show subtitles earlier"
+                      >
+                        <MinusIcon className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="text-ink min-w-14 text-center font-mono text-xs">
+                        {offset > 0 ? '+' : ''}
+                        {offset.toFixed(2)}s
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => nudge(TIMING_STEP)}
+                        className={iconButtonClass}
+                        aria-label="Show subtitles later"
+                        title="Show subtitles later"
+                      >
+                        <PlusIcon className="h-3.5 w-3.5" />
+                      </button>
+                      {offset !== 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setOffset(0)}
+                          className={`${linkButtonClass} ml-auto`}
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <label className={checkboxRowClass}>
@@ -345,7 +560,7 @@ export default function Controls({
                   </label>
 
                   <p className="text-ink-faint text-xs">
-                    Applies to every movie; the options page has the rest.
+                    Size, position and the box apply to every movie.
                   </p>
                 </div>
               )}

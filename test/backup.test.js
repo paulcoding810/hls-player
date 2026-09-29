@@ -208,6 +208,11 @@ describe('sanitizeSettings', () => {
       'the box stays unless it is turned off',
     )
     assert.equal(read({ subtitleBackground: false }).subtitleBackground, false)
+
+    assert.equal(read({ subtitlePosition: 8 }).subtitlePosition, 8)
+    assert.equal(read({ subtitlePosition: 99 }).subtitlePosition, 12, 'clamped to the highest')
+    assert.equal(read({ subtitlePosition: 0 }).subtitlePosition, 1.5, 'clamped to the lowest')
+    assert.equal(read({ subtitlePosition: 'up' }).subtitlePosition, 4.5)
   })
 
   it('keeps the subtitle settings out of the per-movie config', () => {

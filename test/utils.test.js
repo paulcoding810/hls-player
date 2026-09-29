@@ -5,6 +5,8 @@ import { fillTemplate, readPath } from '@/utils/jsonPath'
 import { labelFor, readSubtitles, toVtt } from '@/utils/subtitles'
 import { findPayloadStart, stripDecoyPrefix, PNG_SIGNATURE } from '@/utils/segments'
 import { formatTime } from '@/utils/time'
+import { SUBTITLE_POSITIONS, SUBTITLE_SIZES } from '@/helper/constants'
+import { DEFAULT_SETTINGS, sanitizeSettings } from '@/helper/settings'
 import { manifestMime, isManifestUrl, normalizeReferer, normalizeSource } from '@/utils/url'
 
 describe('readPath', () => {
@@ -216,6 +218,29 @@ describe('url helpers', () => {
 
   it('accepts a bare domain as a Referer', () =>
     assert.equal(normalizeReferer('example.com'), 'https://example.com/'))
+})
+
+describe('subtitle option lists', () => {
+  it('offers the default size and position among its choices', () => {
+    // A default missing from the list would show as a blank select.
+    assert.ok(SUBTITLE_SIZES.some((size) => size.value === DEFAULT_SETTINGS.subtitleSize))
+    assert.ok(SUBTITLE_POSITIONS.some((spot) => spot.value === DEFAULT_SETTINGS.subtitlePosition))
+  })
+
+  it('keeps every offered value within what sanitize accepts', () => {
+    for (const size of SUBTITLE_SIZES) {
+      assert.equal(
+        sanitizeSettings({ ...DEFAULT_SETTINGS, subtitleSize: size.value }).subtitleSize,
+        size.value,
+      )
+    }
+    for (const spot of SUBTITLE_POSITIONS) {
+      assert.equal(
+        sanitizeSettings({ ...DEFAULT_SETTINGS, subtitlePosition: spot.value }).subtitlePosition,
+        spot.value,
+      )
+    }
+  })
 })
 
 describe('formatTime', () => {

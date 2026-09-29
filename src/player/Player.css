@@ -13,7 +13,7 @@
    than ones sitting slightly high. */
 .player-shell .video-js.vjs-controls-disabled .vjs-text-track-display,
 .player-shell .video-js.vjs-user-inactive.vjs-playing .vjs-text-track-display {
-  bottom: 4.5rem;
+  bottom: calc(var(--subtitle-bottom, 4.5) * 1rem);
 }
 
 .player-shell .vjs-loading-spinner {

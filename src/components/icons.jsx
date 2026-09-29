@@ -47,6 +47,12 @@ export const CloseIcon = (props) => (
   </Icon>
 )
 
+export const MinusIcon = (props) => (
+  <Icon {...props}>
+    <path d="M5 12h14" />
+  </Icon>
+)
+
 export const PlusIcon = (props) => (
   <Icon {...props}>
     <path d="M12 5v14" />

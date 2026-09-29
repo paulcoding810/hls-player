@@ -66,6 +66,9 @@ const VIDEO_JS_OPTIONS = {
   errorDisplay: false,
   preload: 'auto',
   fill: true,
+  // Without this, `TextTrackDisplay` renders only the first `showing` subtitle
+  // track and silently drops the rest — so a second track would never appear.
+  textTrackDisplay: { allowMultipleShowingTracks: true },
   html5: {
     // Always play through videojs-http-streaming so the Referer override
     // applies to every playlist and segment request.
@@ -902,7 +905,10 @@ export default function Player() {
         className={`player-shell bg-surface text-ink flex h-screen flex-col ${
           globals.subtitleBackground ? '' : 'subtitles-bare'
         }`}
-        style={{ '--subtitle-scale': globals.subtitleSize }}
+        style={{
+          '--subtitle-scale': globals.subtitleSize,
+          '--subtitle-bottom': globals.subtitlePosition,
+        }}
       >
         <header className="border-line flex items-center gap-3 border-b px-4 py-2">
           <button
