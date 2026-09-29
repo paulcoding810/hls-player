@@ -823,7 +823,8 @@ export default function Player() {
 
   const saveMovie = async ({ episodes, ...patch }) => {
     await updateMovie(movie.id, patch)
-    setLibrary(await setEpisodes(movie.id, episodes))
+    // A source-backed movie's form omits them: only the source sets them.
+    setLibrary(episodes ? await setEpisodes(movie.id, episodes) : await getLibrary())
     setPanel('episodes')
   }
 

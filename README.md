@@ -180,6 +180,10 @@ Sources travel with the export, and each has a **copy** button that puts it on t
 shape **Paste JSON instead** reads back — its local id left out, so it can be handed to someone
 else.
 
+Editing a movie a source added shows its episodes as a list rather than editable text, because they
+name a video instead of a URL — the rest of its config is edited as usual, and saving leaves the
+episodes alone. **Refresh** is what changes them.
+
 ### Refreshing
 
 A movie added from a source remembers where it came from and carries a refresh button. It

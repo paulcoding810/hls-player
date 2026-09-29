@@ -392,7 +392,8 @@ export default function Gallery() {
       await addMovie({ ...config, episodes })
     } else {
       await updateMovie(editing, config)
-      await setEpisodes(editing, episodes)
+      // A source-backed movie's form omits them: only the source sets them.
+      if (episodes) await setEpisodes(editing, episodes)
     }
     await refresh()
   }

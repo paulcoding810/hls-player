@@ -50,17 +50,25 @@ export default function MovieFields({
   // Pasting is an alternative to filling the form, so it is offered only when
   // adding — editing already has the saved values laid out in the fields.
   const [json, setJson] = useState(null)
+  /**
+   * A movie a source added has no episode URLs to edit — they name a video and
+   * are resolved on play — so the list is shown rather than offered as text,
+   * and saving leaves it alone.
+   */
+  const fromSource = Boolean(movie?.source)
 
   const handleSubmit = (event) => {
     event.preventDefault()
     const title = draft.title.trim()
-    const { episodes, skipped } = parseEpisodeLines(episodesText)
+    const { episodes, skipped } = fromSource
+      ? { episodes: null, skipped: 0 }
+      : parseEpisodeLines(episodesText)
 
     if (!title) {
       setError('Give the movie a title.')
       return
     }
-    if (!episodes.length) {
+    if (!fromSource && !episodes.length) {
       setError('Add at least one episode URL. Delete the movie to remove it entirely.')
       return
     }
@@ -81,7 +89,8 @@ export default function MovieFields({
       skipLeading: draft.skipLeading,
       skipTrailing: draft.skipTrailing,
       autoSkip: draft.autoSkip ?? null,
-      episodes,
+      // Absent means "leave them as they are"; only the source changes them.
+      ...(fromSource ? {} : { episodes }),
     })
   }
 
@@ -188,7 +197,7 @@ export default function MovieFields({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      {modeSwitch}
+      {!fromSource && modeSwitch}
 
       <div>
         <label className={labelClass} htmlFor={`${idPrefix}-title`}>
@@ -225,30 +234,48 @@ export default function MovieFields({
         removed={removed}
       />
 
-      <div>
-        <label className={labelClass} htmlFor={`${idPrefix}-episodes`}>
-          Episodes
-        </label>
-        <textarea
-          id={`${idPrefix}-episodes`}
-          rows={movie ? 8 : 4}
-          spellCheck="false"
-          className={`${inputClass} resize-y font-mono text-xs`}
-          placeholder={
-            'https://example.com/ep1.m3u8\n' +
-            'Episode 2 | https://example.com/ep2.mpd https://example.com/ep2.en.vtt'
-          }
-          value={episodesText}
-          onChange={(event) => setEpisodesText(event.target.value)}
-        />
-        <p className={helpClass}>
-          HLS (<code>.m3u8</code>) or DASH (<code>.mpd</code>), one per line, optionally{' '}
-          <code>Title | URL</code>. Untitled episodes are numbered; removing a line removes the
-          episode. Subtitle files (<code>.vtt</code> or <code>.srt</code>) follow the video URL on
-          the same line, separated by spaces — use <strong>Paste JSON instead</strong> to name or
-          label them.
-        </p>
-      </div>
+      {fromSource ? (
+        <div>
+          <span className={labelClass}>Episodes</span>
+          <ul className="border-line bg-elevated max-h-48 divide-y divide-[var(--color-line)] overflow-y-auto rounded-md border">
+            {(movie.episodes ?? []).map((episode) => (
+              <li key={episode.id} className="truncate px-3 py-1.5 text-xs" title={episode.title}>
+                {episode.title}
+              </li>
+            ))}
+          </ul>
+          <p className={helpClass}>
+            {movie.episodes?.length ?? 0} episode(s) from the source that added this movie. They
+            name a video rather than a URL, so they are not edited here — the refresh button on the
+            library card asks the source for the current list.
+          </p>
+        </div>
+      ) : (
+        <div>
+          <label className={labelClass} htmlFor={`${idPrefix}-episodes`}>
+            Episodes
+          </label>
+          <textarea
+            id={`${idPrefix}-episodes`}
+            rows={movie ? 8 : 4}
+            spellCheck="false"
+            className={`${inputClass} resize-y font-mono text-xs`}
+            placeholder={
+              'https://example.com/ep1.m3u8\n' +
+              'Episode 2 | https://example.com/ep2.mpd https://example.com/ep2.en.vtt'
+            }
+            value={episodesText}
+            onChange={(event) => setEpisodesText(event.target.value)}
+          />
+          <p className={helpClass}>
+            HLS (<code>.m3u8</code>) or DASH (<code>.mpd</code>), one per line, optionally{' '}
+            <code>Title | URL</code>. Untitled episodes are numbered; removing a line removes the
+            episode. Subtitle files (<code>.vtt</code> or <code>.srt</code>) follow the video URL on
+            the same line, separated by spaces — use <strong>Paste JSON instead</strong> to name or
+            label them.
+          </p>
+        </div>
+      )}
 
       {error && <p className="text-danger text-xs">{error}</p>}
 
