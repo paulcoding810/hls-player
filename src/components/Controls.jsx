@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
   FullscreenExitIcon,
+  LayersIcon,
   MinusIcon,
   PlusIcon,
   SettingsIcon,
@@ -95,6 +96,9 @@ export default function Controls({
   onHoldControls,
   subtitleSettings,
   onSubtitleSettings,
+  streams = [],
+  currentStream,
+  onChooseStream,
   hasPrevious,
   hasNext,
   fullscreen,
@@ -111,6 +115,7 @@ export default function Controls({
   /** Subtitle and caption tracks the stream carries, and which is showing. */
   const [tracks, setTracks] = useState([])
   const [tuning, setTuning] = useState(false)
+  const [sourcing, setSourcing] = useState(false)
   /** A second track shown at the same time, above the first. */
   const [secondId, setSecondId] = useState('off')
   /** Seconds the cues are shifted by; positive shows them later. */
@@ -439,6 +444,54 @@ export default function Controls({
               </option>
             ))}
           </select>
+
+          {streams.length > 1 && (
+            <div className="relative flex items-center">
+              {sourcing && (
+                <div className="border-line bg-panel/95 absolute right-0 bottom-full mb-2 flex max-h-72 w-72 flex-col gap-1 overflow-y-auto rounded-md border p-2 backdrop-blur-sm">
+                  {streams.map((entry) => (
+                    <button
+                      key={entry.url}
+                      type="button"
+                      onClick={() => {
+                        onChooseStream?.(entry)
+                        setSourcing(false)
+                        onHoldControls?.(false)
+                      }}
+                      className={`flex flex-col items-start gap-0.5 rounded-md border px-3 py-2 text-left transition ${
+                        entry.url === currentStream
+                          ? 'border-primary text-primary'
+                          : 'border-line text-ink hover:bg-elevated'
+                      }`}
+                    >
+                      <span className="w-full truncate text-sm">{entry.name || 'Stream'}</span>
+                      {entry.description && (
+                        <span className="text-ink-faint w-full text-xs whitespace-pre-line">
+                          {entry.description}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !sourcing
+                  setSourcing(next)
+                  // The bar fades on idle; an open menu must outlast that.
+                  onHoldControls?.(next)
+                }}
+                className={`${iconButtonClass} ${sourcing ? 'text-primary' : ''}`}
+                aria-label="Stream source"
+                aria-expanded={sourcing}
+                title="Stream source"
+              >
+                <LayersIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
           {tracks.length > 0 && (
             <div className="relative flex items-center gap-1">

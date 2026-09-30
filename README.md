@@ -177,7 +177,12 @@ That has one consequence worth knowing: an episode's watched position is stored 
 id rather than the URL, so it survives the URL changing between plays. Episodes added by hand are
 unaffected — their URL is still the key, and every position already stored still resolves.
 
-The first stream the addon offers that this player can open is the one that plays. If it marks a
+The first stream the addon offers that this player can open is the one that plays **by default**.
+Where it offers more than one, the control bar carries a source menu listing them with their names
+and sizes; switching resumes at the same second rather than starting over, because a position is
+stored against the episode rather than the URL. A stream picked by hand is followed into the next
+episode when the addon marks it with a `bingeGroup` — its own way of saying "the same provider and
+quality" — so a choice made once lasts the season. If it marks a
 stream with `proxyHeaders`, the `Referer` there is applied through the same header override the
 rest of the app uses, and any subtitles it ships with join the control bar's subtitle menu, labelled
 by language. Those are fetched and converted like any other subtitle file, so SRT works and a host

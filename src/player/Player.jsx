@@ -27,7 +27,7 @@ import {
 } from '@components/ui'
 import { HOME_PATH, MESSAGE, PLAYBACK_RATES } from '@/helper/constants'
 import { getPlugins } from '@/helper/plugins'
-import { resolveStream } from '@/helper/stremio'
+import { listStreams, pickStream } from '@/helper/stremio'
 import {
   addMovie,
   EMPTY_LIBRARY,
@@ -128,6 +128,14 @@ export default function Player() {
   const configRef = useRef(resolveConfig(null, DEFAULT_SETTINGS))
   /** Addons resolve a URL per play, which takes a moment worth showing. */
   const [resolving, setResolving] = useState(false)
+  /** Every playable stream for this episode, and the URL of the one playing. */
+  const [streams, setStreams] = useState([])
+  const [current, setCurrent] = useState('')
+  /**
+   * The `bingeGroup` of the stream chosen by hand. An addon sets it to mean
+   * "the same provider and quality", so a choice follows the season.
+   */
+  const bingeRef = useRef('')
   /** Whether a track has been turned on for this source already. */
   const chosenTrackRef = useRef(false)
   /** The tracks this page added and their blobs, dropped when the source changes. */
@@ -476,6 +484,57 @@ export default function Player() {
     [clearSubtitles],
   )
 
+  /** Seeking before metadata lands does not stick, so it waits when needed. */
+  const startAt = useCallback((time) => {
+    const instance = playerRef.current
+    if (!instance) return
+
+    const apply = () => {
+      instance.currentTime(time)
+      holdRef.current = false
+      savedAtRef.current = time
+      instance.play()?.catch(() => {})
+    }
+
+    if (instance.readyState() >= 1) apply()
+    else instance.one('loadedmetadata', apply)
+  }, [])
+
+  /**
+   * Puts one stream on the player. `at` resumes where playback already was,
+   * which is what a switch needs; without it the stored-position flow decides.
+   */
+  const applyStream = useCallback(
+    async (instance, source, found, at) => {
+      await applyHeaders(found.referer || configRef.current.referer)
+
+      const { muted, playbackRate, volume } = configRef.current
+      instance.src({ src: found.url, type: manifestMime(found.url) })
+      loadSubtitles(instance, [...(source.subtitles ?? []), ...found.subtitles])
+      instance.volume(volume)
+      instance.muted(Boolean(muted))
+      instance.playbackRate(playbackRate)
+      setCurrent(found.url)
+
+      if (at != null) startAt(at)
+    },
+    [loadSubtitles, startAt],
+  )
+
+  /** Swapping stream keeps the position: progress is keyed by episode, not URL. */
+  const chooseStream = useCallback(
+    (found) => {
+      const instance = playerRef.current
+      if (!instance || found.url === current) return
+
+      bingeRef.current = found.bingeGroup
+      applyStream(instance, source, found, instance.currentTime()).catch((error) =>
+        setError(error.message),
+      )
+    },
+    [applyStream, current, source],
+  )
+
   // Load whenever what is playing changes.
   useEffect(() => {
     if (!ready || !source) return
@@ -497,14 +556,12 @@ export default function Player() {
       setLevels([])
       setLevel('auto')
       setResolving(false)
+      setStreams([])
+      setCurrent('')
 
-      // An episode that names a video rather than a URL is resolved now, and
-      // the addon may supply the `Referer` its stream wants.
-      let playUrl = source.src
-      let referer = configRef.current.referer
-      // An addon may ship subtitles with the stream; the episode's own are
-      // whatever was stored when it was added.
-      let subtitles = source.subtitles ?? []
+      // An episode that names a video rather than a URL is resolved now; the
+      // addon usually offers several, and the rest go to the control bar.
+      let playable = [{ url: source.src, referer: '', subtitles: [], bingeGroup: '' }]
 
       if (source.stream) {
         setResolving(true)
@@ -513,10 +570,7 @@ export default function Player() {
           const plugin = plugins.find((item) => item.id === source.stream.pluginId)
           if (!plugin) throw new Error('The source this episode came from is gone.')
 
-          const found = await resolveStream(plugin, source.stream)
-          playUrl = found.url
-          referer = found.referer || referer
-          subtitles = [...subtitles, ...found.subtitles]
+          playable = await listStreams(plugin, source.stream)
         } catch (streamError) {
           if (!cancelled) setError(streamError.message)
           return
@@ -526,27 +580,23 @@ export default function Player() {
       }
       if (cancelled) return
 
-      try {
-        await applyHeaders(referer)
-      } catch (headerError) {
-        setError(headerError.message)
-        return
-      }
-      if (cancelled) return
-
       const instance = playerRef.current
       if (!instance) return
 
       const stored = await getProgress(srcRef.current)
       if (cancelled) return
 
-      const { autoplay, muted, playbackRate, volume } = configRef.current
+      const { autoplay } = configRef.current
       holdRef.current = Boolean(stored)
-      instance.src({ src: playUrl, type: manifestMime(playUrl) })
-      loadSubtitles(instance, subtitles)
-      instance.volume(volume)
-      instance.muted(Boolean(muted))
-      instance.playbackRate(playbackRate)
+      setStreams(source.stream ? playable : [])
+
+      try {
+        await applyStream(instance, source, pickStream(playable, bingeRef.current))
+      } catch (headerError) {
+        setError(headerError.message)
+        return
+      }
+      if (cancelled) return
 
       if (stored) {
         // Playback waits for the answer instead of starting at zero and jumping.
@@ -560,7 +610,7 @@ export default function Player() {
     return () => {
       cancelled = true
     }
-  }, [ready, source?.id, source?.src, config.referer, loadSubtitles])
+  }, [ready, source?.id, source?.src, config.referer, applyStream])
 
   useEffect(() => {
     if (!source) document.title = 'HLS Player'
@@ -629,22 +679,6 @@ export default function Player() {
   useEffect(() => {
     if (!source) playerRef.current?.pause()
   }, [source])
-
-  /** Seeking before metadata lands does not stick, so it waits when needed. */
-  const startAt = useCallback((time) => {
-    const instance = playerRef.current
-    if (!instance) return
-
-    const apply = () => {
-      instance.currentTime(time)
-      holdRef.current = false
-      savedAtRef.current = time
-      instance.play()?.catch(() => {})
-    }
-
-    if (instance.readyState() >= 1) apply()
-    else instance.one('loadedmetadata', apply)
-  }, [])
 
   const handleResume = useCallback(() => {
     const position = resume?.position ?? 0
@@ -1100,6 +1134,9 @@ export default function Player() {
                   onHoldControls={setSeeking}
                   subtitleSettings={globals}
                   onSubtitleSettings={updateSettings}
+                  streams={streams}
+                  currentStream={current}
+                  onChooseStream={chooseStream}
                   fullscreen={fullscreen}
                   onToggleFullscreen={toggleFullscreen}
                 />

@@ -7,7 +7,8 @@ import {
   fetchStremioEpisodes,
   forgetManifest,
   listCatalogs,
-  resolveStream,
+  listStreams,
+  pickStream,
   searchStremio,
 } from '@/helper/stremio'
 import { addMovie, episodeKey, getLibrary, setEpisodes } from '@/helper/library'
@@ -185,10 +186,10 @@ describe('fetchStremioEpisodes', () => {
   })
 })
 
-describe('resolveStream', () => {
+describe('listStreams', () => {
   const stream = { pluginId: 'p1', type: 'series', videoId: 'tt1:1:1' }
 
-  it('takes the first stream it can actually open', async () => {
+  it('returns every playable stream, in the addon’s order', async () => {
     serve({
       stream: {
         streams: [
@@ -200,29 +201,61 @@ describe('resolveStream', () => {
         ],
       },
     })
-    const found = await resolveStream(ADDON, stream)
-    assert.equal(found.url, 'https://cdn.test/a.m3u8')
-    assert.equal(found.name, '720p')
+
+    const found = await listStreams(ADDON, stream)
+    assert.deepEqual(
+      found.map((entry) => entry.name),
+      ['720p', '1080p'],
+      'the three it cannot open are left out',
+    )
+    assert.equal(found[0].url, 'https://cdn.test/a.m3u8')
   })
 
-  it('reads the Referer an addon says the stream needs', async () => {
+  it('reads what the menu shows for each one', async () => {
     serve({
       stream: {
         streams: [
           {
             url: 'https://cdn.test/a.m3u8',
-            behaviorHints: {
-              notWebReady: true,
-              proxyHeaders: { request: { Referer: 'https://ref.test/' } },
-            },
+            name: '1080p',
+            description: 'Provider A · 2.3 GB',
+            behaviorHints: { bingeGroup: 'providerA-1080p' },
           },
+          // `title` is the deprecated spelling of `description`.
+          { url: 'https://cdn.test/b.m3u8', name: '720p', title: 'Provider B' },
         ],
       },
     })
-    assert.equal((await resolveStream(ADDON, stream)).referer, 'https://ref.test/')
+
+    const [first, second] = await listStreams(ADDON, stream)
+    assert.equal(first.description, 'Provider A · 2.3 GB')
+    assert.equal(first.bingeGroup, 'providerA-1080p')
+    assert.equal(second.description, 'Provider B')
+    assert.equal(second.bingeGroup, '')
   })
 
-  it('carries the subtitles the stream ships with', async () => {
+  it('keeps each stream’s own Referer and subtitles', async () => {
+    serve({
+      stream: {
+        streams: [
+          {
+            url: 'https://cdn.test/a.m3u8',
+            behaviorHints: { proxyHeaders: { request: { Referer: 'https://one.test/' } } },
+            subtitles: [{ id: '1', url: 'https://subs.test/en.srt', lang: 'eng' }],
+          },
+          { url: 'https://cdn.test/b.m3u8' },
+        ],
+      },
+    })
+
+    const [first, second] = await listStreams(ADDON, stream)
+    assert.equal(first.referer, 'https://one.test/')
+    assert.equal(first.subtitles.length, 1)
+    assert.equal(second.referer, '', 'not inherited from the one before it')
+    assert.deepEqual(second.subtitles, [])
+  })
+
+  it('carries the subtitles a stream ships with, labelled by language', async () => {
     serve({
       stream: {
         streams: [
@@ -237,11 +270,10 @@ describe('resolveStream', () => {
       },
     })
 
-    const { subtitles } = await resolveStream(ADDON, stream)
+    const [{ subtitles }] = await listStreams(ADDON, stream)
     assert.equal(subtitles.length, 2)
     assert.equal(subtitles[0].src, 'https://subs.test/en.srt')
     assert.equal(subtitles[0].label, 'eng', 'the language is what the menu shows')
-    assert.equal(subtitles[0].lang, 'eng')
   })
 
   it('falls back to the subtitle id when it has no language', async () => {
@@ -255,7 +287,7 @@ describe('resolveStream', () => {
         ],
       },
     })
-    assert.equal((await resolveStream(ADDON, stream)).subtitles[0].label, 'sub-7')
+    assert.equal((await listStreams(ADDON, stream))[0].subtitles[0].label, 'sub-7')
   })
 
   it('drops a subtitle with no usable URL, keeping the rest', async () => {
@@ -273,29 +305,56 @@ describe('resolveStream', () => {
         ],
       },
     })
-    const { subtitles } = await resolveStream(ADDON, stream)
+    const [{ subtitles }] = await listStreams(ADDON, stream)
     assert.equal(subtitles.length, 1)
     assert.equal(subtitles[0].lang, 'fra')
   })
 
-  it('is an empty list when the stream ships none', async () => {
-    serve({ stream: { streams: [{ url: 'https://cdn.test/a.m3u8' }] } })
-    assert.deepEqual((await resolveStream(ADDON, stream)).subtitles, [])
-  })
-
   it('says so when every stream needs another app', async () => {
     serve({ stream: { streams: [{ infoHash: 'abc' }, { infoHash: 'def' }] } })
-    await assert.rejects(() => resolveStream(ADDON, stream), /torrents and external links/)
+    await assert.rejects(() => listStreams(ADDON, stream), /torrents and external links/)
   })
 
   it('says so when there is nothing at all', async () => {
     serve({ stream: { streams: [] } })
-    await assert.rejects(() => resolveStream(ADDON, stream), /found no stream/)
+    await assert.rejects(() => listStreams(ADDON, stream), /found no stream/)
   })
 
   it('rejects a stream whose URL is not http(s)', async () => {
     serve({ stream: { streams: [{ url: 'magnet:?xt=urn:btih:abc' }] } })
-    await assert.rejects(() => resolveStream(ADDON, stream), /no stream this player can open/)
+    await assert.rejects(() => listStreams(ADDON, stream), /no stream this player can open/)
+  })
+})
+
+describe('pickStream', () => {
+  const streams = [
+    { url: 'a', bingeGroup: 'providerA' },
+    { url: 'b', bingeGroup: 'providerB' },
+    { url: 'c', bingeGroup: '' },
+  ]
+
+  it('takes what the addon put first when nothing is remembered', () => {
+    assert.equal(pickStream(streams, '').url, 'a')
+    assert.equal(pickStream(streams, undefined).url, 'a')
+  })
+
+  it('follows the remembered group, so a choice lasts the season', () => {
+    assert.equal(pickStream(streams, 'providerB').url, 'b')
+  })
+
+  it('falls back to the first when the group is not offered here', () => {
+    assert.equal(pickStream(streams, 'providerZ').url, 'a')
+  })
+
+  it('never matches a stream that carries no group', () => {
+    // Otherwise an empty remembered group would match every unmarked stream.
+    assert.equal(pickStream([{ url: 'c', bingeGroup: '' }], '').url, 'c')
+    assert.equal(pickStream(streams, '').url, 'a')
+  })
+
+  it('has nothing to pick from an empty list', () => {
+    assert.equal(pickStream([], 'x'), null)
+    assert.equal(pickStream(undefined, 'x'), null)
   })
 })
 

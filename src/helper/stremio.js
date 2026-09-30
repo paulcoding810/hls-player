@@ -206,11 +206,11 @@ function subtitlesOf(stream) {
 }
 
 /**
- * The first playable stream for one video, with whatever it carries.
- * `proxyHeaders` is how an addon says the stream wants a `Referer`, which is
- * exactly what the header override does.
+ * Every playable stream for one video, in the order the addon gave them —
+ * addons put their own preference first. `proxyHeaders` is how one says the
+ * stream wants a `Referer`, which is exactly what the header override does.
  */
-export async function resolveStream(plugin, stream) {
+export async function listStreams(plugin, stream) {
   const base = baseOf(plugin)
   const label = plugin.name || 'The addon'
   const payload = await fetchJson(
@@ -219,9 +219,9 @@ export async function resolveStream(plugin, stream) {
   )
 
   const streams = Array.isArray(payload?.streams) ? payload.streams : []
-  const found = streams.find(playable)
+  const found = streams.filter(playable)
 
-  if (!found) {
+  if (!found.length) {
     throw new Error(
       streams.length
         ? `${label} offered no stream this player can open — torrents and external links need another app.`
@@ -229,13 +229,27 @@ export async function resolveStream(plugin, stream) {
     )
   }
 
-  const headers = found.behaviorHints?.proxyHeaders?.request ?? {}
-  const referer = headers.Referer ?? headers.referer ?? ''
+  return found.map((entry) => {
+    const headers = entry.behaviorHints?.proxyHeaders?.request ?? {}
+    return {
+      // Streams carry no id, and two pointing at one URL are one stream.
+      url: normalizeSource(entry.url),
+      referer: headers.Referer ?? headers.referer ?? '',
+      name: entry.name || '',
+      // `title` is the deprecated spelling of `description`.
+      description: entry.description || entry.title || '',
+      bingeGroup: entry.behaviorHints?.bingeGroup || '',
+      subtitles: subtitlesOf(entry),
+    }
+  })
+}
 
-  return {
-    url: normalizeSource(found.url),
-    referer,
-    name: found.name || found.title || '',
-    subtitles: subtitlesOf(found),
-  }
+/**
+ * Which of them to play. A `bingeGroup` is the addon's own way of saying "the
+ * same provider and quality as last time", so a choice made once follows the
+ * season; anything else falls back to what the addon put first.
+ */
+export function pickStream(streams, bingeGroup) {
+  if (!streams?.length) return null
+  return (bingeGroup && streams.find((entry) => entry.bingeGroup === bingeGroup)) || streams[0]
 }

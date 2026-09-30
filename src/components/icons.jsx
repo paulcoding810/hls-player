@@ -162,6 +162,14 @@ export const SearchIcon = (props) => (
   </Icon>
 )
 
+export const LayersIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12 4l8 4-8 4-8-4 8-4Z" />
+    <path d="M4 12l8 4 8-4" />
+    <path d="M4 16l8 4 8-4" />
+  </Icon>
+)
+
 export const CopyIcon = (props) => (
   <Icon {...props}>
     <rect x="9" y="9" width="11" height="11" rx="2" />
