@@ -509,6 +509,8 @@ export default function Player() {
       await applyHeaders(found.referer || configRef.current.referer)
 
       const { muted, playbackRate, volume } = configRef.current
+      // Every stream brings its own tracks, so the choice is made again.
+      chosenTrackRef.current = false
       instance.src({ src: found.url, type: manifestMime(found.url) })
       loadSubtitles(instance, [...(source.subtitles ?? []), ...found.subtitles])
       instance.volume(volume)
@@ -757,12 +759,14 @@ export default function Player() {
   }, [player, rememberVolume])
 
   /**
-   * Turns a track on once per source when the setting asks for it. Tracks
+   * Turns a track on once per stream when the setting asks for it. Tracks
    * arrive after the manifest is parsed, and subtitle files later still, so
-   * this waits for them rather than reading the list once.
+   * this waits for them rather than reading the list once. It is keyed on the
+   * stream rather than the episode: switching source replaces every track, and
+   * the old list is still attached when the episode changes.
    */
   useEffect(() => {
-    if (!player || !globals.subtitlesOn) return undefined
+    if (!player || !globals.subtitlesOn || !current) return undefined
     const list = player.textTracks()
     let timer
 
@@ -814,7 +818,7 @@ export default function Player() {
       list.removeEventListener('addtrack', soon)
       player.off('loadedmetadata', soon)
     }
-  }, [player, globals.subtitlesOn, globals.subtitleLang, source?.id])
+  }, [player, globals.subtitlesOn, globals.subtitleLang, current])
 
   /** The rate is remembered globally, so it outlives this episode. */
   const setRate = useCallback(

@@ -25,6 +25,15 @@ describe('toVtt', () => {
     assert.equal(toVtt(`\uFEFF${vtt}`), vtt, 'a BOM would stop WEBVTT being recognised')
   })
 
+  it('fixes SRT times under a WEBVTT header', () => {
+    // The header is no promise about the cues: one comma makes the parser
+    // throw "Malformed timestamp" and discard every cue in the file.
+    const mixed = 'WEBVTT\n\n1\n00:05:38,310 --> 00:05:40,070\nComma under a VTT header'
+    const out = toVtt(mixed)
+    assert.ok(out.startsWith('WEBVTT\n\n'), 'the header it already had is not doubled')
+    assert.ok(out.includes('00:05:38.310 --> 00:05:40.070'))
+  })
+
   for (const [name, input] of [
     ['empty', ''],
     ['null', null],

@@ -16,10 +16,12 @@ export function toVtt(text) {
     .trim()
 
   if (!body) return ''
-  if (/^WEBVTT/.test(body)) return body
 
+  // The header is not evidence of the times: files announcing WEBVTT and then
+  // using SRT's comma are common, and the parser rejects every cue in one.
   // SRT cue numbers are legal VTT cue identifiers, so only the times change.
-  return `WEBVTT\n\n${body.replace(SRT_TIME, '$1.$2')}`
+  const cues = body.replace(SRT_TIME, '$1.$2')
+  return /^WEBVTT/.test(cues) ? cues : `WEBVTT\n\n${cues}`
 }
 
 /** A label for a track the user never named, from the file name. */
