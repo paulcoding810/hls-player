@@ -12,7 +12,8 @@ global settings supply the config.
 
 Three pages: `home.html` (`src/home/Home.jsx`) is the library and filters it, `catalog.html`
 (`src/catalog/Catalog.jsx`) searches and browses the Stremio sources and is the only place movies
-are added from one, and `player.html`
+are added from one — a result opens `MovieDetails.jsx`, whose `fetchStremioDetails()` read also
+supplies the episodes Add stores, and `player.html`
 (`src/player/Player.jsx`) plays what its own query string names —
 `?movie=<id>&episode=<id|1-based index>`, or `?src=<url>` for a grabbed link — and sends you back to
 the library page when neither resolves. There is no router: the pages hand off by navigating to a URL

@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 import { jsonReply, stubFetch, stubStorage } from './helpers.mjs'
 import {
   browseCatalog,
+  detailsOf,
+  fetchStremioDetails,
   fetchStremioEpisodes,
   forgetManifest,
   listCatalogs,
@@ -143,6 +145,68 @@ describe('searchStremio', () => {
     const asked = serve({ manifest: MANIFEST, catalog: { metas: [] } })
     await searchStremio({ ...ADDON, url: 'https://addon.test' }, 'x')
     assert.ok(asked[0].endsWith('https://addon.test/manifest.json'), asked[0])
+  })
+})
+
+describe('detailsOf', () => {
+  it('reads what the addon filled in', () => {
+    const details = detailsOf({
+      name: ' Show ',
+      poster: 'https://img.test/p.jpg',
+      description: 'A plot.',
+      releaseInfo: '2008–2013',
+      runtime: '47 min',
+      imdbRating: '9.5',
+      genres: ['Drama', ' ', 'Crime'],
+      cast: ['A', 'B'],
+      director: ['C'],
+      videos: [{ season: 1 }, { season: 1 }, { season: 2 }, { season: 0 }],
+    })
+
+    assert.equal(details.title, 'Show')
+    assert.equal(details.released, '2008–2013')
+    assert.equal(details.rating, 9.5, 'rating arrives as a string')
+    assert.deepEqual(details.genres, ['Drama', 'Crime'])
+    assert.equal(details.seasons, 2, 'specials (season 0) are not a season')
+  })
+
+  it('takes genres from links when the deprecated field is absent', () => {
+    const details = detailsOf({
+      links: [
+        { name: 'Comedy', category: 'Genres' },
+        { name: 'Someone', category: 'Cast' },
+      ],
+    })
+    assert.deepEqual(details.genres, ['Comedy'])
+  })
+
+  it('leaves out what is missing rather than inventing it', () => {
+    const details = detailsOf({ year: 1999 })
+    assert.equal(details.released, '1999')
+    assert.equal(details.rating, null)
+    assert.equal(details.description, '')
+    assert.deepEqual(details.cast, [])
+    assert.equal(details.seasons, 0)
+  })
+})
+
+describe('fetchStremioDetails', () => {
+  it('returns details and episodes from one meta request', async () => {
+    const calls = serve({
+      meta: {
+        meta: {
+          id: 'tt1',
+          name: 'Show',
+          description: 'Plot',
+          videos: [{ id: 'tt1:1:1', season: 1, episode: 1 }],
+        },
+      },
+    })
+
+    const { details, episodes } = await fetchStremioDetails(ADDON, { id: 'tt1', type: 'series' })
+    assert.equal(details.description, 'Plot')
+    assert.equal(episodes[0].stream.videoId, 'tt1:1:1')
+    assert.equal(calls.filter((url) => url.includes('/meta/')).length, 1)
   })
 })
 

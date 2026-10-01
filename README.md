@@ -164,7 +164,8 @@ It does two things:
   simply stops.
 
 Either way a result offers **Add**, **Watch** when it is already in the library, and a copy button
-for its JSON. The library page keeps only its own filter — typing there narrows what you already
+for its JSON. Clicking the result itself opens its details — plot, year, runtime, rating, genres,
+cast and episode count, from the addon's `/meta/` — with the same actions. The library page keeps only its own filter — typing there narrows what you already
 have and never reaches the network.
 
 Addons work in three steps, and the third is the one that shows: a catalog gives titles, a title

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
+import MovieDetails from '@components/MovieDetails'
 import SearchResults from '@components/SearchResults'
 import Toast from '@components/Toast'
 import { FilmIcon, LibraryIcon, SearchIcon, SettingsIcon } from '@components/icons'
@@ -14,7 +15,12 @@ import { HOME_PATH } from '@/helper/constants'
 import { addMovie, EMPTY_LIBRARY, getLibrary, movieToJson, resumeEpisodeId } from '@/helper/library'
 import { openOptions, playerUrlForEpisode } from '@/helper/player'
 import { getPlugins, searchAll } from '@/helper/plugins'
-import { browseCatalog, fetchStremioEpisodes, listCatalogs } from '@/helper/stremio'
+import {
+  browseCatalog,
+  fetchStremioDetails,
+  fetchStremioEpisodes,
+  listCatalogs,
+} from '@/helper/stremio'
 
 /** What a catalog hands back in one go; the next page starts after it. */
 const PAGE = 100
@@ -47,6 +53,8 @@ export default function Catalog() {
 
   const [adding, setAdding] = useState('')
   const [copying, setCopying] = useState('')
+  /** The result opened in the details view, and what its `/meta/` returned. */
+  const [viewing, setViewing] = useState(null)
 
   useEffect(() => {
     ;(async () => {
@@ -147,12 +155,27 @@ export default function Catalog() {
     }
   }
 
-  const addResult = async (plugin, result) => {
+  const openDetails = async (plugin, result) => {
+    const key = `${plugin.id}:${result.id}`
+    setViewing({ key, plugin, result })
+    try {
+      const found = await fetchStremioDetails(plugin, result)
+      // Closed, or another opened, while this one was loading.
+      setViewing((current) => (current?.key === key ? { ...current, ...found } : current))
+    } catch (error) {
+      setViewing((current) =>
+        current?.key === key ? { ...current, error: error.message } : current,
+      )
+    }
+  }
+
+  /** `known` is the episode list the details view already read, if it did. */
+  const addResult = async (plugin, result, known) => {
     const key = `${plugin.id}:${result.id}`
     setAdding(key)
     setNotice(null)
     try {
-      const episodes = await fetchStremioEpisodes(plugin, result)
+      const episodes = known ?? (await fetchStremioEpisodes(plugin, result))
       if (!episodes.length) throw new Error(`${plugin.name} returned no episodes for this title.`)
 
       await addMovie({
@@ -277,6 +300,25 @@ export default function Catalog() {
 
           <Toast notice={notice} onDismiss={() => setNotice(null)} />
 
+          {viewing && (
+            <MovieDetails
+              key={viewing.key}
+              result={viewing.result}
+              details={viewing.details}
+              episodes={viewing.episodes}
+              error={viewing.error}
+              movie={added.get(viewing.key)}
+              adding={adding === viewing.key}
+              copying={copying === viewing.key}
+              onAdd={() => addResult(viewing.plugin, viewing.result, viewing.episodes)}
+              onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
+              onCopy={() => copyResult(viewing.plugin, viewing.result)}
+              onClose={() => setViewing(null)}
+            >
+              <Toast notice={notice} onDismiss={() => setNotice(null)} />
+            </MovieDetails>
+          )}
+
           {groups !== null ? (
             <SearchResults
               groups={groups}
@@ -287,6 +329,7 @@ export default function Catalog() {
               onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
               onCopy={copyResult}
               copying={copying}
+              onOpen={openDetails}
             />
           ) : picked ? (
             <div className="flex flex-col gap-4">
@@ -299,6 +342,7 @@ export default function Catalog() {
                 onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
                 onCopy={copyResult}
                 copying={copying}
+                onOpen={openDetails}
               />
               {skip !== null && results.length > 0 && (
                 <button

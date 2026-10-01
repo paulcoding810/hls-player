@@ -22,6 +22,7 @@ export default function SearchResults({
   onWatch,
   onCopy,
   copying,
+  onOpen,
 }) {
   // A catalog with nothing in it is noise once there are several per source;
   // when they are all empty the page says so once instead.
@@ -57,19 +58,24 @@ export default function SearchResults({
                 key={key}
                 className="border-line bg-panel flex items-center gap-3 rounded-md border p-2"
               >
-                <div className="bg-elevated h-16 w-11 shrink-0 overflow-hidden rounded-md">
-                  {result.poster ? (
-                    <img src={result.poster} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-ink-faint grid h-full place-items-center">
-                      <FilmIcon />
-                    </span>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpen(group.plugin, result)}
+                  className="hover:text-primary flex min-w-0 flex-1 items-center gap-3 rounded-md text-left transition"
+                  title={`Details for ${result.title}`}
+                >
+                  <span className="bg-elevated block h-16 w-11 shrink-0 overflow-hidden rounded-md">
+                    {result.poster ? (
+                      <img src={result.poster} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-ink-faint grid h-full place-items-center">
+                        <FilmIcon />
+                      </span>
+                    )}
+                  </span>
 
-                <h3 className="min-w-0 flex-1 truncate text-sm" title={result.title}>
-                  {result.title}
-                </h3>
+                  <span className="min-w-0 flex-1 truncate text-sm">{result.title}</span>
+                </button>
 
                 <button
                   type="button"

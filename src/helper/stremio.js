@@ -157,11 +157,7 @@ function titleOf(video, position) {
   return `Episode ${position + 1}`
 }
 
-/**
- * Episodes carrying the video they name rather than a URL. A movie has no
- * `videos`, so its own id is the one episode.
- */
-export async function fetchStremioEpisodes(plugin, item) {
+async function readMeta(plugin, item) {
   const base = baseOf(plugin)
   const type = item.type || 'movie'
   const payload = await fetchJson(
@@ -171,7 +167,11 @@ export async function fetchStremioEpisodes(plugin, item) {
 
   const meta = payload?.meta
   if (!meta) throw new Error(`${plugin.name || 'The addon'} returned no details for this title.`)
+  return { meta, type }
+}
 
+/** Episodes carrying the video they name rather than a URL; a movie is its own one. */
+function episodesOf(meta, plugin, type) {
   const videos = Array.isArray(meta.videos) ? meta.videos : []
   const entries = videos.length ? videos : [{ id: meta.id, title: meta.name }]
 
@@ -181,6 +181,55 @@ export async function fetchStremioEpisodes(plugin, item) {
       title: titleOf(video, position),
       stream: { pluginId: plugin.id, type, videoId: String(video.id) },
     }))
+}
+
+export async function fetchStremioEpisodes(plugin, item) {
+  const { meta, type } = await readMeta(plugin, item)
+  return episodesOf(meta, plugin, type)
+}
+
+function text(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function names(value) {
+  return (Array.isArray(value) ? value : []).map(text).filter(Boolean)
+}
+
+/**
+ * What a details view shows, read defensively: addons fill a different subset
+ * of the meta each. `genres` is the deprecated spelling some still send.
+ */
+export function detailsOf(meta) {
+  const genreLinks = (Array.isArray(meta?.links) ? meta.links : [])
+    .filter((link) => link?.category === 'Genres')
+    .map((link) => link.name)
+  const seasons = new Set(
+    (Array.isArray(meta?.videos) ? meta.videos : [])
+      .map((video) => Number(video?.season))
+      .filter((season) => Number.isFinite(season) && season > 0),
+  )
+  const rating = Number(meta?.imdbRating)
+
+  return {
+    title: text(meta?.name),
+    poster: normalizeSource(meta?.poster) ?? '',
+    background: normalizeSource(meta?.background) ?? '',
+    description: text(meta?.description),
+    released: text(meta?.releaseInfo) || (meta?.year ? String(meta.year) : ''),
+    runtime: text(meta?.runtime),
+    genres: names(meta?.genres).length ? names(meta.genres) : names(genreLinks),
+    rating: Number.isFinite(rating) && rating > 0 ? rating : null,
+    cast: names(meta?.cast),
+    director: names(meta?.director),
+    seasons: seasons.size,
+  }
+}
+
+/** Details and episodes from one request, so adding from the view costs no second. */
+export async function fetchStremioDetails(plugin, item) {
+  const { meta, type } = await readMeta(plugin, item)
+  return { details: detailsOf(meta), episodes: episodesOf(meta, plugin, type) }
 }
 
 /** What this player can open: everything else needs a torrent client or a browser. */
