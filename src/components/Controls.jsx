@@ -332,8 +332,16 @@ export default function Controls({
     onHoldControls?.(false)
   }
 
+  // A clicked control keeps no focus to swallow shortcuts; selects keep theirs to stay open.
+  const releaseFocus = (event) => {
+    event.target.closest?.('button, input')?.blur()
+  }
+
   return (
-    <div className="flex flex-col gap-1.5 bg-gradient-to-t from-black/85 to-transparent px-4 pt-8 pb-3">
+    <div
+      onPointerUp={releaseFocus}
+      className="flex flex-col gap-1.5 bg-gradient-to-t from-black/85 to-transparent px-4 pt-8 pb-3"
+    >
       <div className="relative">
         {hover !== null && seekable && (
           <div
