@@ -69,8 +69,6 @@ export function pluginToJson(plugin) {
       adPattern: plugin.adPattern || undefined,
       // Only worth stating when it is not the default.
       enabled: plugin.enabled === false ? false : undefined,
-      search: plugin.search,
-      details: plugin.details,
     },
     null,
     2,

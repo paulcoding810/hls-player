@@ -25,7 +25,7 @@ export default function PluginForm({ plugin, onSave, onClose }) {
       className={`${dialogClass} max-h-[85vh] w-[min(40rem,92vw)] overflow-y-auto`}
     >
       <h2 id="plugin-form-title" className="mb-4 text-sm font-semibold">
-        {plugin ? 'Edit source' : 'Add source'}
+        {plugin ? 'Edit Stremio addon' : 'Add Stremio addon'}
       </h2>
 
       <PluginFields

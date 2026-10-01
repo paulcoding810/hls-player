@@ -161,6 +161,11 @@ describe('pluginToJson', () => {
     assert.equal(shared.adPattern, ADDON.adPattern)
   })
 
+  it('carries nothing from the removed custom-API kind', () => {
+    const shared = JSON.parse(pluginToJson({ ...ADDON, search: { url: 'x' }, details: {} }))
+    assert.ok(!('search' in shared) && !('details' in shared))
+  })
+
   it('states a source that is switched off', () => {
     assert.equal(JSON.parse(pluginToJson({ ...ADDON, enabled: false })).enabled, false)
   })

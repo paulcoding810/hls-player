@@ -44,10 +44,14 @@ async function fetchJson(url, label) {
 /** A manifest changes rarely, and a search asks for it once per catalog. */
 const manifests = new Map()
 
-/** `https://host/path/manifest.json` and `https://host/path` both work. */
+/**
+ * `https://host/path/manifest.json` and `https://host/path` both work, and so
+ * does the `stremio://` install link an addon's page hands out.
+ */
 function baseOf(plugin) {
   return String(plugin.url ?? '')
     .trim()
+    .replace(/^stremio:\/\//i, 'https://')
     .replace(/\/manifest\.json\/?$/i, '')
     .replace(/\/$/, '')
 }
@@ -60,6 +64,33 @@ export async function readManifest(plugin) {
     manifests.set(base, await fetchJson(`${base}/manifest.json`, plugin.name || 'The addon'))
   }
   return manifests.get(base)
+}
+
+/** A resource is a bare name or `{ name, types, idPrefixes }`. */
+function resourceNames(manifest) {
+  return new Set(
+    (Array.isArray(manifest?.resources) ? manifest.resources : [])
+      .map((resource) => (typeof resource === 'string' ? resource : resource?.name))
+      .filter(Boolean),
+  )
+}
+
+/**
+ * What the options page needs to judge an addon. `missing` names what this
+ * player depends on and the addon lacks: episodes resolve their stream through
+ * the addon that listed them, so a catalog-only addon finds things it cannot play.
+ */
+export function describeManifest(manifest) {
+  const resources = resourceNames(manifest)
+  const catalogs = (manifest?.catalogs ?? []).filter((catalog) => catalog?.type && catalog?.id)
+
+  return {
+    name: typeof manifest?.name === 'string' ? manifest.name.trim() : '',
+    version: typeof manifest?.version === 'string' ? manifest.version : '',
+    catalogs: catalogs.length,
+    searchable: catalogs.filter((catalog) => hasExtra(catalog, 'search')).length,
+    missing: ['catalog', 'meta', 'stream'].filter((name) => !resources.has(name)),
+  }
 }
 
 /** Forgets a cached manifest, so editing a source re-reads it. */

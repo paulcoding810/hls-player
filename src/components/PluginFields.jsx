@@ -11,20 +11,20 @@ import {
   labelClass,
 } from './ui'
 import { EMPTY_PLUGIN, pluginToJson } from '@/helper/plugins'
-import { forgetManifest, searchStremio } from '@/helper/stremio'
+import { describeManifest, forgetManifest, readManifest } from '@/helper/stremio'
 import { compilePattern } from '@/utils/playlist'
 
 const JSON_EXAMPLE = `{
-  "name": "Cinemeta",
-  "url": "https://v3-cinemeta.strem.io/manifest.json",
+  "name": "My addon",
+  "url": "https://addon.example.com/manifest.json",
   "referer": "https://example.com/",
   "adPattern": "^/ads/.+\\.ts$"
 }`
 
 /**
  * A source is a Stremio addon and a manifest URL; the protocol supplies the
- * rest. **Test** runs a real search against it, which is the only way to know
- * the addon answers before saving it.
+ * rest. **Test** reads the manifest, which is what says whether the addon can
+ * be searched and played here at all.
  */
 export default function PluginFields({ plugin, onSave, onCancel }) {
   const [draft, setDraft] = useState(() => structuredClone({ ...EMPTY_PLUGIN, ...(plugin ?? {}) }))
@@ -32,13 +32,10 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
   const [json, setJson] = useState(null)
   const [test, setTest] = useState(null)
 
-  const section = (name, patch) => setDraft({ ...draft, [name]: { ...draft[name], ...patch } })
-  const fields = (name, patch) => section(name, { fields: { ...draft[name].fields, ...patch } })
-
   const handleSubmit = (event) => {
     event.preventDefault()
     if (!draft.name.trim()) {
-      setError('Give the source a name.')
+      setError('Give the addon a name — Test can fill it in.')
       return
     }
     if (!draft.url.trim()) {
@@ -60,9 +57,9 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
       throw new Error('That is not valid JSON.')
     }
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error('Expected a single source object.')
+      throw new Error('Expected a single addon object.')
     }
-    if (!String(parsed.name ?? '').trim()) throw new Error('Give the source a "name".')
+    if (!String(parsed.name ?? '').trim()) throw new Error('Give the addon a "name".')
     return { ...structuredClone(EMPTY_PLUGIN), ...parsed, name: String(parsed.name).trim() }
   }
 
@@ -106,9 +103,11 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
     try {
       // An edited URL must not be answered from the manifest read before it.
       forgetManifest(draft)
-      // Grouped by catalog; the form only needs to show that it answered.
-      const results = (await searchStremio(draft, 'test')).flatMap((found) => found.results)
-      setTest({ results })
+      const summary = describeManifest(await readManifest(draft))
+      // The addon names itself; a blank name is filled rather than left to the user.
+      if (!draft.name.trim() && summary.name)
+        setDraft((current) => ({ ...current, name: summary.name }))
+      setTest({ summary })
     } catch (testError) {
       setTest({ error: testError.message })
     }
@@ -138,7 +137,7 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
         Cancel
       </button>
       <button type="submit" className={buttonClass}>
-        {plugin ? 'Save' : 'Add source'}
+        {plugin ? 'Save' : 'Add addon'}
       </button>
     </div>
   )
@@ -150,7 +149,7 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
 
         <div>
           <label className={labelClass} htmlFor="plugin-json">
-            Source JSON
+            Addon JSON
           </label>
           <textarea
             id="plugin-json"
@@ -162,7 +161,7 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
             value={json}
             onChange={(event) => setJson(event.target.value)}
           />
-          <p className={helpClass}>The same shape the export writes, so sources can be shared.</p>
+          <p className={helpClass}>The same shape the export writes, so addons can be shared.</p>
         </div>
         {error && <p className="text-danger text-xs">{error}</p>}
         {actions}
@@ -175,16 +174,36 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
       {modeSwitch}
 
       <div>
+        <label className={labelClass} htmlFor="plugin-manifest">
+          Manifest URL
+        </label>
+        <input
+          id="plugin-manifest"
+          className={`${inputClass} font-mono text-xs`}
+          spellCheck="false"
+          autoFocus
+          placeholder="https://addon.example.com/manifest.json"
+          value={draft.url}
+          onChange={(event) => setDraft({ ...draft, url: event.target.value })}
+        />
+        <p className={helpClass}>
+          The addon&apos;s install link; a <code>stremio://</code> one works too. It needs to offer
+          streams over HTTP — torrent-only addons have nothing this player can open.
+        </p>
+      </div>
+
+      <div>
         <label className={labelClass} htmlFor="plugin-name">
           Name
         </label>
         <input
           id="plugin-name"
           className={inputClass}
-          autoFocus
+          placeholder="Torrentio"
           value={draft.name}
           onChange={(event) => setDraft({ ...draft, name: event.target.value })}
         />
+        <p className={helpClass}>Left blank, Test fills in the name the addon gives itself.</p>
       </div>
 
       <div>
@@ -200,8 +219,8 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
           onChange={(event) => setDraft({ ...draft, referer: event.target.value })}
         />
         <p className={helpClass}>
-          Given to movies added from this source, for playback. It cannot be sent on the API calls
-          below — <code>Referer</code> is a forbidden header for <code>fetch</code>.
+          Only for streams that need one and do not say so — an addon can name its own per stream,
+          and that wins. Copied onto movies added from this source.
         </p>
       </div>
 
@@ -223,24 +242,6 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
         </p>
       </div>
 
-      <div>
-        <label className={labelClass} htmlFor="plugin-manifest">
-          Manifest URL
-        </label>
-        <input
-          id="plugin-manifest"
-          className={`${inputClass} font-mono text-xs`}
-          spellCheck="false"
-          placeholder="https://v3-cinemeta.strem.io/manifest.json"
-          value={draft.url}
-          onChange={(event) => setDraft({ ...draft, url: event.target.value })}
-        />
-        <p className={helpClass}>
-          Searching uses the addon&apos;s catalogs; each episode&apos;s stream is resolved when you
-          play it. Torrent-only addons will not work — there is no client here.
-        </p>
-      </div>
-
       <label className={checkboxRowClass}>
         <input
           type="checkbox"
@@ -248,7 +249,7 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
           checked={draft.enabled}
           onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}
         />
-        Search this source
+        Search and browse this addon
       </label>
 
       {error && <p className="text-danger text-xs">{error}</p>}
@@ -257,18 +258,26 @@ export default function PluginFields({ plugin, onSave, onCancel }) {
         <button type="button" onClick={runTest} className={ghostButtonClass}>
           Test
         </button>
-        {test?.running && <p className="text-ink-faint text-xs">Searching…</p>}
+        {test?.running && <p className="text-ink-faint text-xs">Reading the manifest…</p>}
         {test?.error && <p className="text-danger text-xs">{test.error}</p>}
-        {test?.results && (
-          <div className="text-ink-faint min-w-0 text-xs">
-            <p>
-              {test.results.length} result(s) for “test”.
-              {!test.results.length && ' Check the URL and the results path.'}
+        {test?.summary && (
+          <div className="min-w-0 text-xs">
+            <p className="text-ink-muted truncate">
+              {test.summary.name || 'Unnamed addon'}
+              {test.summary.version && (
+                <span className="text-ink-faint"> v{test.summary.version}</span>
+              )}
+              <span className="text-ink-faint">
+                {' '}
+                · {test.summary.catalogs} catalog(s), {test.summary.searchable} searchable
+              </span>
             </p>
-            {test.results[0] && (
-              <p className="text-ink-muted truncate font-mono">
-                id={test.results[0].id} title={test.results[0].title}
-                {test.results[0].poster ? ` poster=${test.results[0].poster}` : ''}
+            {test.summary.missing.length > 0 && (
+              <p className="text-warn">
+                Offers no {test.summary.missing.join(' or ')} —{' '}
+                {test.summary.missing.includes('stream')
+                  ? 'what it lists cannot be played here.'
+                  : 'it will be missing from the Sources page.'}
               </p>
             )}
           </div>

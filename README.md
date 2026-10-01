@@ -192,8 +192,11 @@ by language. Those are fetched and converted like any other subtitle file, so SR
 that sends no CORS headers is not a problem. A source's own **Referer** and **ad segment pattern** are copied onto every
 movie it adds, as playback settings.
 
-**Test** on the source form runs a real search against the addon, which is the only way to know it
-answers before saving it.
+A source is added on the options page by its manifest URL — the `stremio://` install link an addon
+hands out works too. **Test** on that form reads the manifest: it fills in the addon's own name,
+counts its catalogs and how many can be searched, and warns when the addon offers no `stream`
+resource. Such a catalog-only addon (Cinemeta is one) lists titles that cannot play here, because an
+episode's streams are asked of the addon that listed it.
 
 Sources travel with the export, and each has a **copy** button that puts it on the clipboard in the
 shape **Paste JSON instead** reads back — its local id left out, so it can be handed to someone

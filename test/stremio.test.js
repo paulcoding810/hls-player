@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { jsonReply, stubFetch, stubStorage } from './helpers.mjs'
 import {
   browseCatalog,
+  describeManifest,
   detailsOf,
   fetchStremioDetails,
   fetchStremioEpisodes,
@@ -532,6 +533,43 @@ describe('a Stremio movie in the library', () => {
       videoId: 'tt1:1:1',
     })
     assert.equal(restored.source.type, 'series', 'refresh needs the type back')
+  })
+})
+
+describe('describeManifest', () => {
+  it('counts catalogs and the searchable ones', () => {
+    const summary = describeManifest(MANIFEST)
+    assert.equal(summary.name, 'Addon')
+    assert.ok(summary.catalogs > 0)
+    assert.ok(summary.searchable <= summary.catalogs)
+    assert.deepEqual(summary.missing, [])
+  })
+
+  it('names what a catalog-only addon cannot do here', () => {
+    const summary = describeManifest({
+      name: 'Cinemeta',
+      resources: ['catalog', { name: 'meta', types: ['movie'] }],
+      catalogs: [],
+    })
+    assert.deepEqual(summary.missing, ['stream'], 'object-form resources count too')
+  })
+
+  it('survives a manifest with nothing in it', () => {
+    assert.deepEqual(describeManifest(null), {
+      name: '',
+      version: '',
+      catalogs: 0,
+      searchable: 0,
+      missing: ['catalog', 'meta', 'stream'],
+    })
+  })
+})
+
+describe('stremio:// install links', () => {
+  it('are read over https', async () => {
+    const asked = serve({ manifest: MANIFEST })
+    await listCatalogs({ ...ADDON, url: 'stremio://addon.test/manifest.json' })
+    assert.equal(asked[0], 'https://addon.test/manifest.json')
   })
 })
 

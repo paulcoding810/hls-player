@@ -179,16 +179,17 @@ export const Options = () => {
             className={`${ghostButtonClass} ml-auto`}
           >
             <PlusIcon />
-            Add source
+            Add addon
           </button>
         </div>
         <p className="text-ink-faint mt-1 text-xs">
-          A source describes one site&apos;s JSON API — a search URL, a details URL, and where the
-          values sit in each response. The library&apos;s search bar queries every enabled one.
+          Each source is a Stremio addon, added by its manifest URL. Enabled ones are searched and
+          browsed on the Sources page; an episode&apos;s streams are asked of the addon that listed
+          it when it plays, so it must offer HTTP streams, not only torrents.
         </p>
 
         {plugins.length === 0 ? (
-          <p className="text-ink-muted mt-3 text-sm">No sources yet.</p>
+          <p className="text-ink-muted mt-3 text-sm">No addons yet.</p>
         ) : (
           <ul className="border-line mt-3 divide-y divide-[var(--color-line)] rounded-md border">
             {plugins.map((plugin) => (
@@ -198,11 +199,14 @@ export const Options = () => {
                   className={checkboxClass}
                   checked={plugin.enabled}
                   onChange={() => togglePlugin(plugin)}
-                  aria-label={`Search ${plugin.name}`}
-                  title={`Search ${plugin.name}`}
+                  aria-label={`Search and browse ${plugin.name}`}
+                  title={`Search and browse ${plugin.name}`}
                 />
-                <span className="min-w-0 flex-1 truncate text-sm" title={plugin.search.url}>
-                  {plugin.name}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-sm">{plugin.name}</span>
+                  <span className="text-ink-faint truncate font-mono text-xs" title={plugin.url}>
+                    {plugin.url}
+                  </span>
                 </span>
                 <button
                   type="button"
