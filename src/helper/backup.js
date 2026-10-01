@@ -37,7 +37,9 @@ export function backupFileName(date = new Date()) {
   return `hls-player-${date.toISOString().slice(0, 10)}.json`
 }
 
+/** `null` is "inherit the global value", and `Number(null)` is 0 — so it is checked first. */
 function numberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null
   const number = Number(value)
   return Number.isFinite(number) && number >= 0 ? Math.round(number) : null
 }

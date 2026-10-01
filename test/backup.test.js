@@ -259,3 +259,35 @@ describe('sanitizeSettings', () => {
     assert.equal(clean.autoSkip, true)
   })
 })
+
+describe('inherited skips', () => {
+  it('stay inherited through a backup', async () => {
+    // Every export writes `null` for them; read as 0, a restore would stop
+    // every movie following the global intro and outro skips.
+    await addMovie({ title: 'Plain', episodes: [{ src: 'https://x.test/1.m3u8' }] })
+    const [movie] = readBackup(JSON.stringify(await buildBackup())).movies
+
+    assert.equal(movie.skipLeading, null)
+    assert.equal(movie.skipTrailing, null)
+    assert.equal(resolveConfig(movie, { ...DEFAULT_SETTINGS, skipTrailing: 60 }).skipTrailing, 60)
+  })
+
+  it('keeps a skip set to 0, which turns it off for the movie', () => {
+    const [movie] = readBackup(
+      JSON.stringify({
+        format: 'hls-player-backup',
+        version: 1,
+        library: {
+          movies: [
+            {
+              title: 'Off',
+              skipLeading: 0,
+              episodes: ['https://x.test/1.m3u8'].map((src) => ({ src })),
+            },
+          ],
+        },
+      }),
+    ).movies
+    assert.equal(movie.skipLeading, 0)
+  })
+})
