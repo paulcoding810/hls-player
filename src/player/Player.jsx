@@ -42,6 +42,7 @@ import {
   updateMovie,
 } from '@/helper/library'
 import { playerUrlForEpisode } from '@/helper/player'
+import { createPreloader, preloadDue } from '@/helper/preload'
 import { clearProgress, getProgress, saveProgress } from '@/helper/progress'
 import { DEFAULT_SETTINGS, getSettings, sanitizeSettings, saveSettings } from '@/helper/settings'
 import api from '@/utils/api'
@@ -103,6 +104,13 @@ const IDLE_DELAY = 2500
 /** How often the playback position is written while watching. */
 const PROGRESS_INTERVAL = 5
 
+/**
+ * Seconds before the end that the next episode's streams are asked for. Late,
+ * because addon URLs are short-lived; the TTL covers a pause on the credits.
+ */
+const PRELOAD_LEAD = 300
+const PRELOAD_TTL = 10 * 60 * 1000
+
 /** Header rules are scoped to this tab by the background script. */
 async function applyHeaders(referer) {
   const response = await api.runtime.sendMessage({
@@ -146,6 +154,10 @@ export default function Player() {
   const [stripped, setStripped] = useState(null)
   const advanceRef = useRef(() => {})
   const hasNextRef = useRef(false)
+  const preloadRef = useRef(() => {})
+  const preloader = useRef(createPreloader({ ttl: PRELOAD_TTL }))
+  /** Guards the preload against repeat `timeupdate` calls, like `skippedRef`. */
+  const preloadedRef = useRef(false)
   /** Guards the automatic outro jump against repeat `timeupdate` calls. */
   const skippedRef = useRef(false)
   /**
@@ -333,7 +345,15 @@ export default function Player() {
         saveProgress(srcRef.current, time, instance.duration())
       }
 
-      const window = skipAt(time, longestDuration(instance, durationRef), configRef.current)
+      const duration = longestDuration(instance, durationRef)
+      const window = skipAt(time, duration, configRef.current)
+      if (
+        !preloadedRef.current &&
+        preloadDue(time, duration, configRef.current.skipTrailing, PRELOAD_LEAD)
+      ) {
+        preloadedRef.current = true
+        preloadRef.current()
+      }
       if (!configRef.current.autoSkip) {
         // Turning auto skip off mid-countdown hands the choice back over.
         setCountdown(null)
@@ -548,6 +568,7 @@ export default function Player() {
       srcRef.current = episodeKey(source)
       savedAtRef.current = 0
       skippedRef.current = false
+      preloadedRef.current = false
       chosenTrackRef.current = false
       durationRef.current = 0
       holdRef.current = false
@@ -572,7 +593,11 @@ export default function Player() {
           const plugin = plugins.find((item) => item.id === source.stream.pluginId)
           if (!plugin) throw new Error('The source this episode came from is gone.')
 
-          playable = await listStreams(plugin, source.stream)
+          const held = preloader.current.take(episodeKey(source))
+          // A preload that failed is simply asked again, and reports as usual.
+          playable = held
+            ? await held.catch(() => listStreams(plugin, source.stream))
+            : await listStreams(plugin, source.stream)
         } catch (streamError) {
           if (!cancelled) setError(streamError.message)
           return
@@ -647,6 +672,16 @@ export default function Player() {
     advanceRef.current = () => {
       if (next) goToEpisode(next.id)
       else playerRef.current?.pause()
+    }
+    // A hand-added episode already has its URL; there is nothing to resolve.
+    preloadRef.current = () => {
+      if (!next?.stream) return
+      preloader.current.start(episodeKey(next), async () => {
+        const plugins = await getPlugins()
+        const plugin = plugins.find((item) => item.id === next.stream.pluginId)
+        if (!plugin) throw new Error('The source this episode came from is gone.')
+        return listStreams(plugin, next.stream)
+      })
     }
   }, [movie, episodeIndex, goToEpisode])
 

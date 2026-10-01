@@ -182,7 +182,8 @@ Where it offers more than one, the control bar carries a source menu listing the
 and sizes; switching resumes at the same second rather than starting over, because a position is
 stored against the episode rather than the URL. A stream picked by hand is followed into the next
 episode when the addon marks it with a `bingeGroup` — its own way of saying "the same provider and
-quality" — so a choice made once lasts the season. If it marks a
+quality" — so a choice made once lasts the season. The next episode's streams are asked for
+as the current one reaches its outro or last two minutes, so moving on skips the wait. If it marks a
 stream with `proxyHeaders`, the `Referer` there is applied through the same header override the
 rest of the app uses, and any subtitles it ships with join the control bar's subtitle menu, labelled
 by language. Those are fetched and converted like any other subtitle file, so SRT works and a host

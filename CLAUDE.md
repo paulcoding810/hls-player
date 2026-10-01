@@ -31,7 +31,8 @@ cleared by `setLastPlayed()` — is what tells a watched movie from one never op
 (`src/helper/plugins.js`), and a source is a Stremio addon: one manifest URL, with
 `src/helper/stremio.js` speaking the protocol. Its episodes name a video rather than a URL and are
 resolved by `listStreams()` on every play, with `pickStream()` choosing among them by remembered
-`bingeGroup`, so `episodeKey()` in `library.js` — not the URL — is an
+`bingeGroup` — the next episode's list is fetched ahead as the current one nears its end, held
+in the one-slot `createPreloader()` (`src/helper/preload.js`) — so `episodeKey()` in `library.js` — not the URL — is an
 episode's identity and the key progress is stored under. `kind` carries its one value on purpose:
 it is what lets a source stored before the custom-API kind was removed, or imported from an older
 export, be recognised and dropped. A plugin also carries the site's `referer` and `adPattern`,
