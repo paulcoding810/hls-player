@@ -178,7 +178,7 @@ export default function Catalog() {
       const episodes = known ?? (await fetchStremioEpisodes(plugin, result))
       if (!episodes.length) throw new Error(`${plugin.name} returned no episodes for this title.`)
 
-      await addMovie({
+      const movie = await addMovie({
         title: result.title,
         poster: result.poster,
         referer: plugin.referer,
@@ -191,11 +191,19 @@ export default function Catalog() {
         },
       })
       setLibrary(await getLibrary())
+      return movie
     } catch (error) {
       setNotice({ tone: 'danger', message: error.message })
+      return null
     } finally {
       setAdding('')
     }
+  }
+
+  /** Playing needs a library entry — progress and the player's URL both name one. */
+  const watchResult = async (plugin, result, known) => {
+    const movie = await addResult(plugin, result, known)
+    if (movie) play(movie.id, resumeEpisodeId(movie))
   }
 
   /** The same JSON the Add movie form's Paste JSON mode reads back. */
@@ -311,6 +319,7 @@ export default function Catalog() {
               adding={adding === viewing.key}
               copying={copying === viewing.key}
               onAdd={() => addResult(viewing.plugin, viewing.result, viewing.episodes)}
+              onWatchNew={() => watchResult(viewing.plugin, viewing.result, viewing.episodes)}
               onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
               onCopy={() => copyResult(viewing.plugin, viewing.result)}
               onClose={() => setViewing(null)}
@@ -327,6 +336,7 @@ export default function Catalog() {
               adding={adding}
               onAdd={addResult}
               onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
+              onWatchNew={watchResult}
               onCopy={copyResult}
               copying={copying}
               onOpen={openDetails}
@@ -340,6 +350,7 @@ export default function Catalog() {
                 adding={adding}
                 onAdd={addResult}
                 onWatch={(movie) => play(movie.id, resumeEpisodeId(movie))}
+                onWatchNew={watchResult}
                 onCopy={copyResult}
                 copying={copying}
                 onOpen={openDetails}

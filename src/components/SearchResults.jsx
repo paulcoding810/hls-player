@@ -20,6 +20,7 @@ export default function SearchResults({
   adding,
   onAdd,
   onWatch,
+  onWatchNew,
   onCopy,
   copying,
   onOpen,
@@ -94,15 +95,27 @@ export default function SearchResults({
                     Watch
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => onAdd(group.plugin, result)}
-                    disabled={adding === key}
-                    className={ghostButtonClass}
-                  >
-                    <PlusIcon className="h-3.5 w-3.5" />
-                    {adding === key ? 'Adding…' : 'Add'}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onAdd(group.plugin, result)}
+                      disabled={adding === key}
+                      className={ghostButtonClass}
+                    >
+                      <PlusIcon className="h-3.5 w-3.5" />
+                      {adding === key ? 'Adding…' : 'Add'}
+                    </button>
+                    {/* Adds it too: a movie is only playable from the library. */}
+                    <button
+                      type="button"
+                      onClick={() => onWatchNew(group.plugin, result)}
+                      disabled={adding === key}
+                      className={ghostButtonClass}
+                    >
+                      <PlayIcon className="h-3.5 w-3.5" />
+                      Watch
+                    </button>
+                  </>
                 )}
               </article>
             )

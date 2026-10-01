@@ -163,7 +163,8 @@ It does two things:
   catalog declares it can be paged. A catalog that cannot be paged, or that returns a short page,
   simply stops.
 
-Either way a result offers **Add**, **Watch** when it is already in the library, and a copy button
+Either way a result offers **Add** and **Watch** — which adds it first, since only a library movie
+can be played — or just **Watch** once it is in the library, and a copy button
 for its JSON. Clicking the result itself opens its details — plot, year, runtime, rating, genres,
 cast and episode count, from the addon's `/meta/` — with the same actions. The library page keeps only its own filter — typing there narrows what you already
 have and never reaches the network.

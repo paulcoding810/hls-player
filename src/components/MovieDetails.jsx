@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import { CloseIcon, CopyIcon, FilmIcon, PlayIcon, PlusIcon } from './icons'
-import { buttonClass, dialogClass, iconButtonClass } from './ui'
+import { buttonClass, dialogClass, ghostButtonClass, iconButtonClass } from './ui'
 
 /**
  * A search result opened up: the addon's `/meta/` read for this title, with
@@ -18,6 +18,7 @@ export default function MovieDetails({
   copying,
   onAdd,
   onWatch,
+  onWatchNew,
   onCopy,
   onClose,
   children,
@@ -129,10 +130,22 @@ export default function MovieDetails({
             Watch
           </button>
         ) : (
-          <button type="button" onClick={onAdd} disabled={adding} className={buttonClass} autoFocus>
-            <PlusIcon className="h-3.5 w-3.5" />
-            {adding ? 'Adding…' : 'Add to library'}
-          </button>
+          <>
+            <button type="button" onClick={onAdd} disabled={adding} className={ghostButtonClass}>
+              <PlusIcon className="h-3.5 w-3.5" />
+              {adding ? 'Adding…' : 'Add to library'}
+            </button>
+            <button
+              type="button"
+              onClick={onWatchNew}
+              disabled={adding}
+              className={buttonClass}
+              autoFocus
+            >
+              <PlayIcon className="h-3.5 w-3.5" />
+              Watch
+            </button>
+          </>
         )}
       </div>
 
