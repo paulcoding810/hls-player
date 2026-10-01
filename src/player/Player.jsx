@@ -1021,49 +1021,6 @@ export default function Player() {
           '--subtitle-bottom': globals.subtitlePosition,
         }}
       >
-        <header className="border-line flex items-center gap-3 border-b px-4 py-2">
-          <button
-            type="button"
-            onClick={goToLibrary}
-            className={ghostButtonClass}
-            title="Back to the library"
-          >
-            <LibraryIcon />
-            Library
-          </button>
-
-          <span className="truncate text-sm" title={source?.src || ''}>
-            {movie?.title ?? source?.title}
-            {movie && source && <span className="text-ink-faint"> · {source.title}</span>}
-          </span>
-          {movie?.episodes.length > 1 && episodeIndex > -1 && (
-            <span className="text-ink-faint shrink-0 text-xs">
-              {episodeIndex + 1} / {movie.episodes.length}
-            </span>
-          )}
-
-          {grabbed ? (
-            <button
-              type="button"
-              onClick={addToLibrary}
-              disabled={Boolean(saved)}
-              className={`${ghostButtonClass} ml-auto`}
-            >
-              <PlusIcon />
-              {saved ? 'Added to library' : 'Add to library'}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setPanel(panel ? null : 'episodes')}
-              className={`${ghostButtonClass} ml-auto ${panel ? activeGhostClass : ''}`}
-            >
-              <PlaylistIcon />
-              Episodes
-            </button>
-          )}
-        </header>
-
         {!granted && (
           <button
             type="button"
@@ -1088,6 +1045,53 @@ export default function Player() {
           onPointerMove={wake}
           onPointerLeave={() => setPointerActive(false)}
         >
+          {/* Overlaid like the control bar, so it never takes height from the video. */}
+          <header
+            className={`absolute inset-x-0 top-0 z-20 flex items-center gap-3 bg-gradient-to-b from-black/85 to-transparent px-4 pt-3 pb-8 transition-opacity duration-200 ${
+              showControls || panel ? 'opacity-100' : 'pointer-events-none opacity-0'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={goToLibrary}
+              className={ghostButtonClass}
+              title="Back to the library"
+            >
+              <LibraryIcon />
+              Library
+            </button>
+
+            <span className="truncate text-sm" title={source?.src || ''}>
+              {movie?.title ?? source?.title}
+              {movie && source && <span className="text-ink-faint"> · {source.title}</span>}
+            </span>
+            {movie?.episodes.length > 1 && episodeIndex > -1 && (
+              <span className="text-ink-faint shrink-0 text-xs">
+                {episodeIndex + 1} / {movie.episodes.length}
+              </span>
+            )}
+
+            {grabbed ? (
+              <button
+                type="button"
+                onClick={addToLibrary}
+                disabled={Boolean(saved)}
+                className={`${ghostButtonClass} ml-auto`}
+              >
+                <PlusIcon />
+                {saved ? 'Added to library' : 'Add to library'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPanel(panel ? null : 'episodes')}
+                className={`${ghostButtonClass} ml-auto ${panel ? activeGhostClass : ''}`}
+              >
+                <PlaylistIcon />
+                Episodes
+              </button>
+            )}
+          </header>
           <div
             ref={stageRef}
             className={`relative min-w-0 flex-1 bg-black ${showControls ? '' : 'cursor-none'}`}
@@ -1190,7 +1194,7 @@ export default function Player() {
                 setPointerActive(true)
               }}
               onPointerLeave={wake}
-              className="border-line bg-panel/95 absolute inset-y-0 right-0 z-10 flex w-80 max-w-[85%] flex-col gap-4 overflow-y-auto border-l p-4 pb-24 backdrop-blur-sm"
+              className="border-line bg-panel/95 absolute inset-y-0 right-0 z-10 flex w-80 max-w-[85%] flex-col gap-4 overflow-y-auto border-l p-4 pt-16 pb-24 backdrop-blur-sm"
             >
               {panel === 'edit' ? (
                 <>
