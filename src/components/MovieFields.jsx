@@ -125,6 +125,10 @@ export default function MovieFields({
 
     try {
       const { episodes, ...config } = parseMovieJson(json)
+      // The form edits URLs, one per line; an addon's episodes have none to show.
+      if (episodes.some((item) => !item.src)) {
+        throw new Error('Episodes from an addon have no URL to edit — save them from JSON.')
+      }
       setDraft({ ...draft, ...config })
       setEpisodesText(episodesToText(episodes))
       setJson(null)

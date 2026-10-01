@@ -5,7 +5,9 @@ import { stubStorage } from './helpers.mjs'
 import {
   addMovie,
   EMPTY_MOVIE,
+  episodeKey,
   getLibrary,
+  isEpisodeKey,
   markWatched,
   movieToJson,
   parseMovieJson,
@@ -82,6 +84,32 @@ describe('parseMovieJson', () => {
 })
 
 describe('movieToJson', () => {
+  it('round trips an addon movie through the paste reader', () => {
+    // What Copy as JSON hands out for a search result: no URL, a named video.
+    const stream = { pluginId: 'p1', type: 'series', videoId: 'tt0108778:1:1' }
+    const text = movieToJson({ title: 'Show', episodes: [{ title: 'Pilot', stream }] })
+    const { episodes } = parseMovieJson(text)
+
+    assert.deepEqual(episodes, [{ title: 'Pilot', stream }])
+  })
+
+  it('refuses an episode with neither a URL nor a whole stream', () => {
+    const text = JSON.stringify({
+      title: 'Show',
+      episodes: [{ title: 'Pilot', stream: { pluginId: 'p1' } }],
+    })
+    assert.throws(() => parseMovieJson(text), /no valid http\(s\) URL or addon stream/)
+  })
+
+  it('stores a pasted addon episode under the same key it plays by', async () => {
+    const stream = { pluginId: 'p1', type: 'movie', videoId: 'tt9' }
+    const { episodes, ...config } = parseMovieJson(
+      movieToJson({ title: 'Film', episodes: [{ title: 'Film', stream }] }),
+    )
+    const movie = await addMovie({ ...config, episodes })
+    assert.equal(episodeKey(movie.episodes[0]), 'stremio:p1:tt9')
+  })
+
   it('round trips through parseMovieJson', () => {
     const source = {
       title: 'Godzilla',
@@ -336,4 +364,21 @@ describe('EMPTY_MOVIE', () => {
     assert.equal(EMPTY_MOVIE.autoSkip, null)
     assert.equal(EMPTY_MOVIE.source, null)
   })
+})
+
+describe('isEpisodeKey', () => {
+  it('accepts every key episodeKey produces', () => {
+    // Progress is stored under these, so the import filter must never reject one.
+    for (const episode of [
+      { src: 'https://x.test/a.m3u8' },
+      { stream: { pluginId: crypto.randomUUID(), type: 'series', videoId: 'tt0108778:1:1' } },
+      { stream: { pluginId: 'p1', type: 'movie', videoId: 'tt9' } },
+    ]) {
+      assert.ok(isEpisodeKey(episodeKey(episode)), episodeKey(episode))
+    }
+  })
+
+  for (const key of ['', 'stremio:', 'stremio:p1', 'javascript:alert(1)', 'ftp://x.test/a', null]) {
+    it(`refuses ${JSON.stringify(key)}`, () => assert.equal(isEpisodeKey(key), false))
+  }
 })

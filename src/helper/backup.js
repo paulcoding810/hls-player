@@ -1,4 +1,11 @@
-import { EMPTY_MOVIE, getLibrary, saveLibrary } from './library'
+import {
+  EMPTY_MOVIE,
+  getLibrary,
+  isEpisodeKey,
+  readSource,
+  readStream,
+  saveLibrary,
+} from './library'
 import { getAllProgress, mergeProgress } from './progress'
 import { EMPTY_PLUGIN, getPlugins, savePlugins } from './plugins'
 import { getSettings, saveSettings } from './settings'
@@ -53,7 +60,7 @@ function sanitizeMovie(raw) {
         id: string(episode?.id) || crypto.randomUUID(),
         title: string(episode?.title).trim() || `Episode ${position + 1}`,
         src: normalizeSource(episode?.src),
-        ...(sanitizeStream(episode?.stream) ? { stream: sanitizeStream(episode.stream) } : {}),
+        ...(readStream(episode?.stream) ? { stream: readStream(episode.stream) } : {}),
         ...(subtitles.length ? { subtitles } : {}),
       }
     })
@@ -73,7 +80,7 @@ function sanitizeMovie(raw) {
     poster: string(raw.poster),
     referer: string(raw.referer),
     adPattern: string(raw.adPattern),
-    source: sanitizeSource(raw.source),
+    source: readSource(raw.source),
     watchedAt: Number.isFinite(raw.watchedAt) ? raw.watchedAt : null,
     skipLeading: numberOrNull(raw.skipLeading),
     skipTrailing: numberOrNull(raw.skipTrailing),
@@ -86,29 +93,14 @@ function sanitizeMovie(raw) {
   }
 }
 
-/** What an episode names when its URL is only resolved at play time. */
-function sanitizeStream(raw) {
-  const pluginId = string(raw?.pluginId)
-  const videoId = string(raw?.videoId)
-  const type = string(raw?.type) || 'movie'
-  return pluginId && videoId ? { pluginId, type, videoId } : null
-}
-
-/** The link back to a source plugin; anything malformed becomes "hand-made". */
-function sanitizeSource(raw) {
-  const pluginId = string(raw?.pluginId)
-  const itemId = string(raw?.itemId)
-  const type = string(raw?.type)
-  return pluginId && itemId ? { pluginId, itemId, ...(type ? { type } : {}) } : null
-}
-
 function sanitizeProgress(raw) {
   if (!raw || typeof raw !== 'object') return {}
   return Object.fromEntries(
     Object.entries(raw).flatMap(([src, entry]) => {
       const position = Number(entry?.position)
       const duration = Number(entry?.duration)
-      if (!normalizeSource(src) || !(position > 0) || !Number.isFinite(duration)) return []
+      // Not `normalizeSource`: an addon's episodes are keyed by the video they name.
+      if (!isEpisodeKey(src) || !(position > 0) || !Number.isFinite(duration)) return []
       return [[src, { position, duration, updatedAt: Number(entry?.updatedAt) || 0 }]]
     }),
   )

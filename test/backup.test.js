@@ -84,6 +84,8 @@ describe('readBackup', () => {
         progress: {
           'https://x.test/1.m3u8': { position: 90, duration: 600, updatedAt: 5 },
           'javascript:alert(1)': { position: 5, duration: 10, updatedAt: 9 },
+          'stremio:p1:tt0108778:1:1': { position: 300, duration: 2400, updatedAt: 7 },
+          'stremio:': { position: 5, duration: 10, updatedAt: 9 },
         },
       }),
     )
@@ -92,7 +94,11 @@ describe('readBackup', () => {
     assert.equal(parsed.movies[0].source, null, 'a half source becomes none')
     assert.equal(parsed.plugins.length, 1, 'a nameless source is dropped')
     assert.equal(parsed.plugins[0].enabled, false, 'enabled:false is preserved')
-    assert.equal(Object.keys(parsed.progress).length, 1, 'a junk position key is dropped')
+    assert.deepEqual(
+      Object.keys(parsed.progress).sort(),
+      ['https://x.test/1.m3u8', 'stremio:p1:tt0108778:1:1'],
+      'junk keys are dropped, an addon episode is kept',
+    )
   })
 
   it('refuses a source described by hand-written paths', () => {

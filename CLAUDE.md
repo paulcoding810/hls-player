@@ -3,7 +3,9 @@
 Chrome/Firefox MV3 extension (Vite + React 18 + Tailwind v4) that plays a library of HLS and DASH
 movies in a dedicated page with a per-tab `Referer` override. `manifestMime()` in
 `src/utils/url.js` picks the manifest type from the URL — `.mpd` is DASH, everything else HLS. See `README.md` for the behaviour and
-`src/background/index.js` for the header-rewriting logic.
+`src/background/index.js` for the header-rewriting logic. On Firefox the per-tab headers are kept
+in `storage.session` by `src/background/headerStore.js`, because its event-page background is
+unloaded while a video sits paused.
 
 Navigations to a `.m3u8`/`.mpd` path are taken over in `src/background/index.js`
 (`webNavigation.onBeforeNavigate`) and sent to `player.html?src=…`, which plays that URL outside
@@ -26,7 +28,8 @@ movies, a movie holds episodes plus its own config, and it carries three timesta
 `sortMovies()` reads — `addedAt`, `updatedAt` (stamped by `updateMovie`) and `lastPlayedAt`
 (stamped by `setLastPlayed`); sorting never rewrites the stored order. Blank config fields (`referer: ''`,
 `skipLeading/skipTrailing: null`) inherit from the global settings via `resolveConfig`. Playback
-positions live in a separate store (`src/helper/progress.js`) keyed by episode URL; a finished
+positions live in a separate store (`src/helper/progress.js`) keyed by `episodeKey()` — a URL, or `stremio:<pluginId>:<videoId>`; anything that filters those
+keys, like the backup import, must go through `isEpisodeKey()`. A finished
 episode has its entry dropped rather than kept, so `movie.watchedAt` — set by `markWatched()`,
 cleared by `setLastPlayed()` — is what tells a watched movie from one never opened. Source plugins live in a fourth store
 (`src/helper/plugins.js`), and a source is a Stremio addon: one manifest URL, with

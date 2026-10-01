@@ -1,3 +1,4 @@
+import { createHeaderStore } from './headerStore'
 import { MESSAGE } from '@/helper/constants'
 import { openHome, playerUrlFor } from '@/helper/player'
 import { getSettings } from '@/helper/settings'
@@ -14,8 +15,13 @@ const useWebRequest = typeof api.webRequest?.onBeforeSendHeaders?.addListener ==
 
 const RESOURCE_TYPES = ['main_frame', 'sub_frame', 'xmlhttprequest', 'media', 'other']
 
-/** tabId -> [[headerName, value], ...] */
-const tabHeaders = new Map()
+/**
+ * tabId -> [[headerName, value], ...], read by the Firefox listener. Chrome's
+ * session rules are kept by the browser itself, so only Firefox persists these.
+ */
+const tabHeaders = createHeaderStore(useWebRequest ? api.storage.session : null)
+// Started now, so a request after waking rarely has to wait for it.
+if (useWebRequest) tabHeaders.load()
 
 function toEntries(headers) {
   return Object.entries(headers || {})
@@ -27,7 +33,7 @@ async function applyHeaders(tabId, headers) {
   const entries = toEntries(headers)
   if (!entries.length) return clearHeaders(tabId)
 
-  tabHeaders.set(tabId, entries)
+  await tabHeaders.set(tabId, entries)
   if (useWebRequest) return
 
   // The tab id doubles as the rule id: one rule per player tab, always unique.
@@ -48,7 +54,7 @@ async function applyHeaders(tabId, headers) {
 }
 
 async function clearHeaders(tabId) {
-  tabHeaders.delete(tabId)
+  await tabHeaders.delete(tabId)
   if (useWebRequest) return
   await api.declarativeNetRequest.updateSessionRules({ removeRuleIds: [tabId] })
 }
@@ -71,18 +77,21 @@ async function dropOrphanRules() {
   }
 }
 
+function rewrite({ tabId, requestHeaders }) {
+  const entries = tabHeaders.get(tabId)
+  if (!entries || !requestHeaders) return undefined
+  const overridden = entries.map(([name]) => name)
+  const headers = requestHeaders.filter((header) => !overridden.includes(header.name.toLowerCase()))
+  entries.forEach(([name, value]) => headers.push({ name, value }))
+  return { requestHeaders: headers }
+}
+
 if (useWebRequest) {
   api.webRequest.onBeforeSendHeaders.addListener(
-    ({ tabId, requestHeaders }) => {
-      const entries = tabHeaders.get(tabId)
-      if (!entries || !requestHeaders) return
-      const overridden = entries.map(([name]) => name)
-      const headers = requestHeaders.filter(
-        (header) => !overridden.includes(header.name.toLowerCase()),
-      )
-      entries.forEach(([name, value]) => headers.push({ name, value }))
-      return { requestHeaders: headers }
-    },
+    // The request that woke the background must wait for the stored rules, or
+    // it goes out without them; Firefox lets a blocking listener return a promise.
+    (details) =>
+      tabHeaders.loaded ? rewrite(details) : tabHeaders.load().then(() => rewrite(details)),
     { urls: ['<all_urls>'] },
     ['blocking', 'requestHeaders'],
   )

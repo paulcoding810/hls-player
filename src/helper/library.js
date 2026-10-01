@@ -45,7 +45,10 @@ export function findEpisode(movie, episodeId) {
   return movie?.episodes.find((episode) => episode.id === episodeId) ?? null
 }
 
-/** `sources` are `{ src, title }`; untitled episodes are numbered. */
+const STREAM_KEY_PREFIX = 'stremio:'
+/** A plugin id holds no colon; a video id may (`tt0108778:1:1`). */
+const STREAM_KEY = /^stremio:[^:]+:.+$/
+
 /**
  * What identifies an episode: its URL, or — when a source resolves the stream
  * only at play time — the video it names. Progress is stored under this, so an
@@ -55,7 +58,12 @@ export function findEpisode(movie, episodeId) {
 export function episodeKey(episode) {
   if (episode?.src) return episode.src
   const stream = episode?.stream
-  return stream ? `stremio:${stream.pluginId}:${stream.videoId}` : ''
+  return stream ? `${STREAM_KEY_PREFIX}${stream.pluginId}:${stream.videoId}` : ''
+}
+
+/** Whether a stored key is one `episodeKey` could have produced. */
+export function isEpisodeKey(key) {
+  return typeof key === 'string' && (STREAM_KEY.test(key) || Boolean(normalizeSource(key)))
 }
 
 export function buildEpisodes(sources, offset = 0) {
@@ -66,6 +74,26 @@ export function buildEpisodes(sources, offset = 0) {
     ...(source.stream ? { stream: source.stream } : {}),
     ...(source.subtitles?.length ? { subtitles: source.subtitles } : {}),
   }))
+}
+
+function text(value) {
+  return typeof value === 'string' ? value : ''
+}
+
+/** What an episode names when its URL is only resolved at play time, or null. */
+export function readStream(raw) {
+  const pluginId = text(raw?.pluginId)
+  const videoId = text(raw?.videoId)
+  const type = text(raw?.type) || 'movie'
+  return pluginId && videoId ? { pluginId, type, videoId } : null
+}
+
+/** The link back to a source plugin; anything malformed becomes "hand-made". */
+export function readSource(raw) {
+  const pluginId = text(raw?.pluginId)
+  const itemId = text(raw?.itemId)
+  const type = text(raw?.type)
+  return pluginId && itemId ? { pluginId, itemId, ...(type ? { type } : {}) } : null
 }
 
 function optionalNumber(value, field) {
@@ -99,14 +127,20 @@ export function parseMovieJson(text) {
   const list = Array.isArray(raw.episodes) ? raw.episodes : []
   if (!list.length) throw new Error('Add an "episodes" array with at least one URL.')
 
+  // An addon's episode carries the video it names instead of a URL, which is
+  // what a copied search result holds.
   const episodes = list.map((entry, position) => {
     const value = typeof entry === 'string' ? entry : (entry?.src ?? entry?.url)
     const src = normalizeSource(value)
-    if (!src) throw new Error(`Episode ${position + 1} has no valid http(s) URL.`)
+    const stream = readStream(entry?.stream)
+    if (!src && !stream) {
+      throw new Error(`Episode ${position + 1} has no valid http(s) URL or addon stream.`)
+    }
     const subtitles = readSubtitles(entry?.subtitles, normalizeSource)
     return {
       title: typeof entry?.title === 'string' ? entry.title.trim() : '',
-      src,
+      ...(src ? { src } : {}),
+      ...(stream ? { stream } : {}),
       ...(subtitles.length ? { subtitles } : {}),
     }
   })
@@ -148,9 +182,10 @@ export function movieToJson(movie) {
       skipLeading: optional(movie.skipLeading),
       skipTrailing: optional(movie.skipTrailing),
       autoSkip: optional(movie.autoSkip),
-      episodes: (movie.episodes ?? []).map(({ title, src, subtitles }) => ({
+      episodes: (movie.episodes ?? []).map(({ title, src, stream, subtitles }) => ({
         title,
         src,
+        stream,
         ...(subtitles?.length ? { subtitles } : {}),
       })),
     },
