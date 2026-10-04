@@ -1,7 +1,7 @@
 {
   "name": "hls-player",
   "displayName": "HLS Player",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "paulcoding",
   "description": "Play HLS (.m3u8) and DASH (.mpd) streams in a clean full-page player. Keep a library, resume where you left off, skip intros",
   "type": "module",
