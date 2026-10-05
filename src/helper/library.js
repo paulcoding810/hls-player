@@ -342,6 +342,21 @@ export async function markWatched(movieId, watched = true) {
   })
 }
 
+/**
+ * The addon a movie came from, for its card: null for a hand-added movie, and
+ * `missing` when that addon has since been deleted — Refresh and Play will fail.
+ */
+export function describeSource(movie, plugins) {
+  if (!movie?.source) return null
+  const plugin = plugins.find((item) => item.id === movie.source.pluginId)
+  const type = movie.source.type
+  return {
+    name: plugin?.name ?? '',
+    type: type ? type[0].toUpperCase() + type.slice(1) : '',
+    missing: !plugin,
+  }
+}
+
 /** Where opening a movie should start: where it was left, else the beginning. */
 export function resumeEpisodeId(movie) {
   return findEpisode(movie, movie?.lastEpisodeId)?.id ?? movie?.episodes?.[0]?.id ?? null

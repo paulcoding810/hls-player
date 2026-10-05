@@ -33,6 +33,7 @@ import {
   getLibrary,
   removeMovie,
   markWatched,
+  describeSource,
   resumeEpisodeId,
   setEpisodes,
   sortMovies,
@@ -60,6 +61,7 @@ function ProgressBar({ percent, className = '' }) {
 
 function MovieCard({
   movie,
+  source,
   positions = {},
   onPlay,
   onEdit,
@@ -103,6 +105,17 @@ function MovieCard({
         <h3 className="truncate text-sm font-medium" title={movie.title}>
           {movie.title}
         </h3>
+        {source &&
+          (source.missing ? (
+            <p className="text-warn truncate text-xs" title="Refresh and Play need the addon">
+              Source removed
+            </p>
+          ) : (
+            <p className="text-ink-muted truncate text-xs" title={source.name}>
+              {source.name}
+              {source.type && <span className="text-ink-faint"> · {source.type}</span>}
+            </p>
+          ))}
         <p className="text-ink-faint text-xs">
           {watched && <span className="text-primary">Watched · </span>}
           {movie.episodes.length} episode{movie.episodes.length === 1 ? '' : 's'}
@@ -424,6 +437,7 @@ export default function Home() {
             <MovieCard
               key={movie.id}
               movie={movie}
+              source={describeSource(movie, plugins)}
               positions={positions}
               onPlay={play}
               onEdit={setEditing}

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { stubStorage } from './helpers.mjs'
 import {
   addMovie,
+  describeSource,
   EMPTY_MOVIE,
   episodeKey,
   getLibrary,
@@ -381,4 +382,23 @@ describe('isEpisodeKey', () => {
   for (const key of ['', 'stremio:', 'stremio:p1', 'javascript:alert(1)', 'ftp://x.test/a', null]) {
     it(`refuses ${JSON.stringify(key)}`, () => assert.equal(isEpisodeKey(key), false))
   }
+})
+
+describe('describeSource', () => {
+  const plugins = [{ id: 'p1', name: 'Addon' }]
+
+  it('names the addon and the type', () => {
+    const movie = { ...EMPTY_MOVIE, source: { pluginId: 'p1', itemId: 'tt1', type: 'series' } }
+    assert.deepEqual(describeSource(movie, plugins), { name: 'Addon', type: 'Series', missing: false })
+  })
+
+  it('says when the addon is gone', () => {
+    // Refresh and Play go through it, so the card warns before they fail.
+    const movie = { ...EMPTY_MOVIE, source: { pluginId: 'gone', itemId: 'tt1' } }
+    assert.deepEqual(describeSource(movie, plugins), { name: '', type: '', missing: true })
+  })
+
+  it('has nothing to say about a hand-added movie', () => {
+    assert.equal(describeSource(EMPTY_MOVIE, plugins), null)
+  })
 })
