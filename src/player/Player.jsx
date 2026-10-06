@@ -41,7 +41,7 @@ import {
   setLastPlayed,
   updateMovie,
 } from '@/helper/library'
-import { playerUrlForEpisode } from '@/helper/player'
+import { leavePlayer, playerUrlForEpisode } from '@/helper/player'
 import { createPreloader, preloadDue } from '@/helper/preload'
 import { clearProgress, getProgress, saveProgress } from '@/helper/progress'
 import { DEFAULT_SETTINGS, getSettings, sanitizeSettings, saveSettings } from '@/helper/settings'
@@ -737,14 +737,14 @@ export default function Player() {
     else instance.pause()
   }, [])
 
-  /** Navigating away kills the player, so the position is stored first. */
+  /** Leaving closes the player, so the position is stored first. */
   const goToLibrary = useCallback(async () => {
     const instance = playerRef.current
     if (instance && srcRef.current && !holdRef.current) {
       instance.pause()
       await saveProgress(srcRef.current, instance.currentTime(), instance.duration())
     }
-    window.location.href = HOME_PATH
+    await leavePlayer()
   }, [])
 
   const toggleFullscreen = useCallback(() => {

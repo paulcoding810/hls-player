@@ -18,8 +18,12 @@ are added from one — a result opens `MovieDetails.jsx`, whose `fetchStremioDet
 supplies the episodes Add stores, and `player.html`
 (`src/player/Player.jsx`) plays what its own query string names —
 `?movie=<id>&episode=<id|1-based index>`, or `?src=<url>` for a grabbed link — and sends you back to
-the library page when neither resolves. There is no router: the pages hand off by navigating to a URL
-built with `playerUrlForEpisode()`/`playerUrlFor()` in `src/helper/player.js`. `lastPlayed` in
+the library page when neither resolves. There is no router: the pages hand off by URL, built with
+`playerUrlForEpisode()`/`playerUrlFor()` in `src/helper/player.js`. Playing from the library or the
+Sources page opens the player in a tab of its own (`openPlayer()`), and the player's Library button
+comes back through `leavePlayer()`, which brings the library tab forward — the library records its
+own tab with `rememberHomeTab()` — and closes the player's, or turns the player into the library
+when no library tab is left. `lastPlayed` in
 storage is the fallback for a bare `player.html` and what the library page's Continue watching panel
 reads; the player rewrites its own URL with `replaceState` when the episode changes. The toolbar
 icon (`openHome()`) always lands on the library page. The data model lives in `src/helper/library.js` — `parseMovieJson()` there reads that same

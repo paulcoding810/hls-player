@@ -389,7 +389,11 @@ describe('describeSource', () => {
 
   it('names the addon and the type', () => {
     const movie = { ...EMPTY_MOVIE, source: { pluginId: 'p1', itemId: 'tt1', type: 'series' } }
-    assert.deepEqual(describeSource(movie, plugins), { name: 'Addon', type: 'Series', missing: false })
+    assert.deepEqual(describeSource(movie, plugins), {
+      name: 'Addon',
+      type: 'Series',
+      missing: false,
+    })
   })
 
   it('says when the addon is gone', () => {

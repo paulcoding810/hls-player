@@ -13,7 +13,7 @@ import {
 } from '@components/ui'
 import { HOME_PATH } from '@/helper/constants'
 import { addMovie, EMPTY_LIBRARY, getLibrary, movieToJson, resumeEpisodeId } from '@/helper/library'
-import { openOptions, playerUrlForEpisode } from '@/helper/player'
+import { openOptions, openPlayer } from '@/helper/player'
 import { getPlugins, searchAll } from '@/helper/plugins'
 import {
   browseCatalog,
@@ -91,9 +91,9 @@ export default function Catalog() {
 
   const picked = catalogs.find((entry) => catalogKey(entry.plugin, entry.catalog) === chosen)
 
+  /** In a tab of its own, so the search results stay where they were. */
   const play = (movieId, episodeId) => {
-    if (!episodeId) return
-    window.location.href = playerUrlForEpisode(movieId, episodeId)
+    if (episodeId) openPlayer(movieId, episodeId)
   }
 
   const runSearch = async (event) => {

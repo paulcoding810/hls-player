@@ -39,7 +39,7 @@ import {
   sortMovies,
   updateMovie,
 } from '@/helper/library'
-import { openOptions, playerUrlForEpisode } from '@/helper/player'
+import { openOptions, openPlayer, rememberHomeTab } from '@/helper/player'
 import { addMovie as addLibraryMovie } from '@/helper/library'
 import { getPlugins, refreshMovie } from '@/helper/plugins'
 import { getAllProgress } from '@/helper/progress'
@@ -240,6 +240,11 @@ export default function Home() {
   /** `{ tone, message }`; errors are `danger`, confirmations `warn`. */
   const [notice, setNotice] = useState(null)
 
+  // The player's Library button comes back to this tab, however it was opened.
+  useEffect(() => {
+    rememberHomeTab().catch(() => {})
+  }, [])
+
   useEffect(() => {
     ;(async () => {
       const [storedLibrary, storedSettings, storedPlugins] = await Promise.all([
@@ -273,10 +278,9 @@ export default function Home() {
     findEpisode(lastMovie, library.lastPlayed?.episodeId) ??
     findEpisode(lastMovie, resumeEpisodeId(lastMovie))
 
-  /** The player reads what to play from its own URL. */
+  /** In a tab of its own: the library stays put, ready for the next one. */
   const play = (movieId, episodeId) => {
-    if (!episodeId) return
-    window.location.href = playerUrlForEpisode(movieId, episodeId)
+    if (episodeId) openPlayer(movieId, episodeId)
   }
 
   const editingMovie = library.movies.find((movie) => movie.id === editing) ?? null
