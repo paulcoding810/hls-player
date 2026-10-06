@@ -56,3 +56,15 @@ export function readSubtitles(value, normalize) {
     })
     .filter(Boolean)
 }
+
+/**
+ * The track to turn on, and whether it settles the choice. A fallback to the
+ * first track does not: the preferred language may simply not have arrived yet.
+ */
+export function preferredTrack(tracks, wanted) {
+  const lang = (wanted ?? '').trim().toLowerCase()
+  const match = lang
+    ? tracks.find((track) => (track.language ?? '').toLowerCase().startsWith(lang))
+    : null
+  return { track: match ?? tracks[0] ?? null, settled: Boolean(match) || !lang }
+}

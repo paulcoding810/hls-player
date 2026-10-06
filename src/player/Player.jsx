@@ -49,7 +49,7 @@ import api from '@/utils/api'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
 import { compilePattern, stripAdSegments } from '@/utils/playlist'
 import { stripDecoyPrefix } from '@/utils/segments'
-import { toVtt } from '@/utils/subtitles'
+import { preferredTrack, toVtt } from '@/utils/subtitles'
 import { fileNameOf, manifestMime, normalizeSource } from '@/utils/url'
 import './Player.css'
 
@@ -89,6 +89,9 @@ const VIDEO_JS_OPTIONS = {
 
 /** Segment bodies worth unwrapping — never `segment-key`, which is 16 bytes. */
 const SEGMENT_TYPES = new Set(['segment', 'segment-media-initialization'])
+
+/** A subtitle host that never answers must not hold back the others for ever. */
+const SUBTITLE_TIMEOUT = 15_000
 
 /** Dragging the slider fires `volumechange` continuously; only the rest is kept. */
 const VOLUME_SETTLE = 400
@@ -144,7 +147,7 @@ export default function Player() {
    * "the same provider and quality", so a choice follows the season.
    */
   const bingeRef = useRef('')
-  /** Whether a track has been turned on for this source already. */
+  /** False, true once settled, or the fallback track shown while the preferred one may come. */
   const chosenTrackRef = useRef(false)
   /** The tracks this page added and their blobs, dropped when the source changes. */
   const ourSubtitles = useRef([])
@@ -477,29 +480,37 @@ export default function Player() {
       clearSubtitles(instance)
       if (!subtitles?.length) return
 
-      await Promise.all(
+      const files = await Promise.all(
         subtitles.map(async (entry) => {
           try {
-            const response = await fetch(entry.src)
+            const response = await fetch(entry.src, {
+              signal: AbortSignal.timeout(SUBTITLE_TIMEOUT),
+            })
             if (!response.ok) throw new Error(`answered ${response.status}`)
 
             const vtt = toVtt(await response.text())
             if (!vtt) throw new Error('was empty')
-            if (playerRef.current !== instance) return
-
-            const url = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
-            const element = instance.addRemoteTextTrack(
-              { src: url, kind: 'subtitles', label: entry.label, srclang: entry.lang || 'und' },
-              // Not manual: video.js should clean the track up with the player.
-              false,
-            )
-            ourSubtitles.current.push({ element, url })
+            return { entry, vtt }
           } catch (error) {
             // One bad file must not cost the others, or the video.
             console.warn(`[hls-player] subtitles ${entry.src} ${error.message}`)
+            return null
           }
         }),
       )
+      if (playerRef.current !== instance) return
+
+      // Added together and in listed order: one at a time as each fetch landed,
+      // the default was picked from whichever file happened to arrive first.
+      files.filter(Boolean).forEach(({ entry, vtt }) => {
+        const url = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
+        const element = instance.addRemoteTextTrack(
+          { src: url, kind: 'subtitles', label: entry.label, srclang: entry.lang || 'und' },
+          // Not manual: video.js should clean the track up with the player.
+          false,
+        )
+        ourSubtitles.current.push({ element, url })
+      })
     },
     [clearSubtitles],
   )
@@ -805,8 +816,11 @@ export default function Player() {
     const list = player.textTracks()
     let timer
 
+    // `chosenTrackRef` is false before a pick, true once settled, and the
+    // track itself while a fallback shows and the preferred one may still come.
     const choose = () => {
-      if (chosenTrackRef.current) return
+      const chosen = chosenTrackRef.current
+      if (chosen === true) return
 
       const tracks = []
       for (let index = 0; index < list.length; index += 1) {
@@ -815,21 +829,21 @@ export default function Player() {
       }
       if (!tracks.length) return
 
-      // A stream that marks a track DEFAULT has already chosen; leave it be.
-      if (tracks.some((track) => track.mode === 'showing')) {
+      const showing = tracks.filter((track) => track.mode === 'showing')
+      // Before a pick, a showing track is the stream's DEFAULT; after one,
+      // anything but our lone fallback means the viewer chose. Either stands.
+      if (chosen ? showing.length !== 1 || showing[0] !== chosen : showing.length) {
         chosenTrackRef.current = true
         return
       }
 
-      const wanted = globals.subtitleLang
-      const pick =
-        (wanted && tracks.find((t) => (t.language || '').toLowerCase().startsWith(wanted))) ||
-        tracks[0]
-
-      tracks.forEach((track) => {
-        track.mode = track === pick ? 'showing' : 'disabled'
-      })
-      chosenTrackRef.current = true
+      const { track: pick, settled } = preferredTrack(tracks, globals.subtitleLang)
+      if (pick !== chosen) {
+        tracks.forEach((track) => {
+          track.mode = track === pick ? 'showing' : 'disabled'
+        })
+      }
+      chosenTrackRef.current = settled || pick
     }
 
     /**

@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { labelFor, readSubtitles, toVtt } from '@/utils/subtitles'
+import { labelFor, preferredTrack, readSubtitles, toVtt } from '@/utils/subtitles'
 import { findPayloadStart, stripDecoyPrefix, PNG_SIGNATURE } from '@/utils/segments'
 import { formatTime } from '@/utils/time'
 import { SUBTITLE_POSITIONS, SUBTITLE_SIZES } from '@/helper/constants'
@@ -41,6 +41,33 @@ describe('toVtt', () => {
   ]) {
     it(`yields nothing for ${name} input`, () => assert.equal(toVtt(input), ''))
   }
+})
+
+describe('preferredTrack', () => {
+  const vi = { language: 'vie' }
+  const en = { language: 'eng' }
+  const unknown = { language: '' }
+
+  it('takes the preferred language wherever it sits', () => {
+    assert.deepEqual(preferredTrack([vi, en], 'en'), { track: en, settled: true })
+  })
+
+  it('falls back to the first, but only provisionally', () => {
+    // The bug: the fallback was final, so a preferred file that landed second was never shown.
+    assert.deepEqual(preferredTrack([vi, unknown], 'en'), { track: vi, settled: false })
+  })
+
+  it('settles on the first when there is no preference', () => {
+    assert.deepEqual(preferredTrack([vi, en], ''), { track: vi, settled: true })
+  })
+
+  it('matches regardless of case and surrounding space', () => {
+    assert.equal(preferredTrack([vi, { language: 'EN-gb' }], ' En ').track.language, 'EN-gb')
+  })
+
+  it('has nothing to pick from an empty list', () => {
+    assert.deepEqual(preferredTrack([], 'en'), { track: null, settled: false })
+  })
 })
 
 describe('labelFor', () => {
