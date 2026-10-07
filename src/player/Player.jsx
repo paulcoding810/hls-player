@@ -49,6 +49,7 @@ import api from '@/utils/api'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
 import { compilePattern, stripAdSegments } from '@/utils/playlist'
 import { stripDecoyPrefix } from '@/utils/segments'
+import { describePlaybackError } from '@/utils/errors'
 import { preferredTrack, toVtt } from '@/utils/subtitles'
 import { fileNameOf, manifestMime, normalizeSource } from '@/utils/url'
 import './Player.css'
@@ -176,6 +177,8 @@ export default function Player() {
   const savedAtRef = useRef(0)
   /** Set while the resume prompt owns the starting position. */
   const holdRef = useRef(false)
+  /** Where playback last was: a failed tech reports 0, and a reconnect resumes here. */
+  const positionRef = useRef(0)
 
   const [player, setPlayer] = useState(null)
   const [playing, setPlaying] = useState(false)
@@ -187,7 +190,11 @@ export default function Player() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [watching, setWatching] = useState(null)
   const [ready, setReady] = useState(false)
+  /** A message of our own, or the MediaError video.js reported — see `describePlaybackError`. */
   const [error, setError] = useState('')
+  const [online, setOnline] = useState(() => navigator.onLine)
+  /** Bumped to run the load again, after an addon lookup failed while offline. */
+  const [reloads, setReloads] = useState(0)
   const [levels, setLevels] = useState([])
   const [level, setLevel] = useState('auto')
   /** `episodes`, `edit`, or null when the panel is closed. */
@@ -289,7 +296,8 @@ export default function Player() {
         saveProgress(srcRef.current, instance.currentTime(), instance.duration())
       }
     })
-    instance.on('error', () => setError(instance.error()?.message || 'Playback failed.'))
+    // Kept whole, not just its message: VHS's request status is what names the failure.
+    instance.on('error', () => setError(instance.error() ?? 'Playback failed.'))
 
     // Count the retries VHS will not count itself, and stop when they run out.
     // `reset()` tears the tech down, which is what actually ends the loop —
@@ -343,6 +351,7 @@ export default function Player() {
 
     instance.on('timeupdate', () => {
       const time = instance.currentTime()
+      if (time > 0) positionRef.current = time
       if (srcRef.current && Math.abs(time - savedAtRef.current) >= PROGRESS_INTERVAL) {
         savedAtRef.current = time
         saveProgress(srcRef.current, time, instance.duration())
@@ -568,6 +577,42 @@ export default function Player() {
     [applyStream, current, source],
   )
 
+  /**
+   * Offline is a state, so its banner stays until the connection is back. What
+   * failed in the meantime is tried again then: the same stream at the same
+   * second, or the whole load when the addon could not even be asked.
+   */
+  const recover = useRef(() => {})
+  recover.current = () => {
+    const instance = playerRef.current
+    if (!error || !instance || !source) return
+    setError('')
+    const found =
+      streams.find((entry) => entry.url === current) ??
+      (current ? { url: current, referer: '', subtitles: [], bingeGroup: '' } : null)
+    if (!found) {
+      setReloads((count) => count + 1)
+      return
+    }
+    applyStream(instance, source, found, positionRef.current).catch((failure) =>
+      setError(failure.message),
+    )
+  }
+
+  useEffect(() => {
+    const goOnline = () => {
+      setOnline(true)
+      recover.current()
+    }
+    const goOffline = () => setOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
   // Load whenever what is playing changes.
   useEffect(() => {
     if (!ready || !source) return
@@ -648,7 +693,7 @@ export default function Player() {
     return () => {
       cancelled = true
     }
-  }, [ready, source?.id, source?.src, config.referer, applyStream])
+  }, [ready, source?.id, source?.src, config.referer, applyStream, reloads])
 
   useEffect(() => {
     if (!source) document.title = 'HLS Player'
@@ -1023,6 +1068,7 @@ export default function Player() {
   }
 
   const showControls = !playing || pointerActive || seeking
+  const problem = describePlaybackError(error, { online })
 
   return (
     <>
@@ -1047,10 +1093,13 @@ export default function Player() {
           </button>
         )}
 
-        {error && (
+        {problem && (
           <p className={`${dangerBannerClass} border-line border-b`}>
             <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{error} Streams that reject the request usually need a matching Referer.</span>
+            <span>
+              {problem.message}
+              {problem.hint && ` ${problem.hint}`}
+            </span>
           </p>
         )}
 
