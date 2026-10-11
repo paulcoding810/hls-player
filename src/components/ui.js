@@ -4,7 +4,7 @@
  */
 
 export const inputClass =
-  'w-full rounded-md border border-line bg-elevated px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-primary'
+  'w-full rounded-md border border-line bg-elevated px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-primary disabled:opacity-40'
 
 export const selectClass =
   'rounded-md border border-line bg-elevated px-2 py-1 text-xs text-ink outline-none transition focus:border-primary'

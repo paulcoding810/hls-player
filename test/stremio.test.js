@@ -12,6 +12,7 @@ import {
   listCatalogs,
   listStreams,
   pickStream,
+  searchCatalog,
   searchStremio,
 } from '@/helper/stremio'
 import { addMovie, episodeKey, getLibrary, setEpisodes } from '@/helper/library'
@@ -146,6 +147,26 @@ describe('searchStremio', () => {
     const asked = serve({ manifest: MANIFEST, catalog: { metas: [] } })
     await searchStremio({ ...ADDON, url: 'https://addon.test' }, 'x')
     assert.ok(asked[0].endsWith('https://addon.test/manifest.json'), asked[0])
+  })
+})
+
+describe('searchCatalog', () => {
+  const catalog = { type: 'movie', id: 'top', name: 'Top', searchable: true }
+
+  it('asks that one catalog only, without reading the manifest', async () => {
+    const asked = serve({ catalog: { metas: [{ id: 'tt1', type: 'movie', name: 'One' }] } })
+    const group = await searchCatalog(ADDON, catalog, 'a b')
+
+    assert.deepEqual(asked, ['https://addon.test/catalog/movie/top/search=a%20b.json'])
+    assert.deepEqual(group.catalog, { id: 'top', type: 'movie', name: 'Top' })
+    assert.equal(group.results[0].title, 'One')
+  })
+
+  it('reports a failure in the group instead of throwing', async () => {
+    serve({})
+    const group = await searchCatalog(ADDON, catalog, 'x')
+    assert.match(group.error, /answered 404/)
+    assert.deepEqual(group.results, [])
   })
 })
 
@@ -589,6 +610,8 @@ describe('listCatalogs', () => {
     assert.equal(catalogs.length, 2, 'browsing does not need a search extra')
     assert.equal(catalogs[0].pageable, true, 'it declares skip')
     assert.equal(catalogs[1].pageable, false)
+    assert.equal(catalogs[0].searchable, true, 'it declares search')
+    assert.equal(catalogs[1].searchable, false)
     assert.equal(catalogs[1].name, 'Featured')
   })
 

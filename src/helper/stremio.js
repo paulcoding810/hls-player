@@ -125,6 +125,7 @@ export async function listCatalogs(plugin) {
       name: catalog.name || catalog.id,
       /** Only a catalog that declares `skip` can be paged past its first page. */
       pageable: hasExtra(catalog, 'skip'),
+      searchable: hasExtra(catalog, 'search'),
     }))
 }
 
@@ -150,33 +151,37 @@ function searchable(manifest) {
 }
 
 /**
+ * One catalog's answer to a search, as a group. A failure is reported in the
+ * group rather than thrown, so it cannot take its neighbours down with it.
+ */
+export async function searchCatalog(plugin, catalog, query, label = plugin.name || 'The addon') {
+  const url = `${baseOf(plugin)}/catalog/${catalog.type}/${catalog.id}/search=${encodeURIComponent(query)}.json`
+  const named = { id: catalog.id, type: catalog.type, name: catalog.name || catalog.id }
+
+  try {
+    const metas = (await fetchJson(url, label))?.metas ?? []
+    const seen = new Set()
+    const results = metas
+      .filter((meta) => meta?.id && meta?.name && !seen.has(meta.id) && seen.add(meta.id))
+      .map((meta) => toResult(meta, plugin))
+
+    return { catalog: named, results, error: '' }
+  } catch (error) {
+    return { catalog: named, results: [], error: error.message }
+  }
+}
+
+/**
  * One entry per catalog that declares a `search` extra, rather than a merged
  * list: an addon publishes a catalog per type, and "Series" and "Movies" are
- * different answers to the same question. A catalog that fails reports itself
- * instead of vanishing into the others.
+ * different answers to the same question.
  */
 export async function searchStremio(plugin, query) {
   const manifest = await readManifest(plugin)
-  const base = baseOf(plugin)
   const label = plugin.name || manifest?.name || 'The addon'
 
   return Promise.all(
-    searchable(manifest).map(async (catalog) => {
-      const url = `${base}/catalog/${catalog.type}/${catalog.id}/search=${encodeURIComponent(query)}.json`
-      const named = { id: catalog.id, type: catalog.type, name: catalog.name || catalog.id }
-
-      try {
-        const metas = (await fetchJson(url, label))?.metas ?? []
-        const seen = new Set()
-        const results = metas
-          .filter((meta) => meta?.id && meta?.name && !seen.has(meta.id) && seen.add(meta.id))
-          .map((meta) => toResult(meta, plugin))
-
-        return { catalog: named, results, error: '' }
-      } catch (error) {
-        return { catalog: named, results: [], error: error.message }
-      }
-    }),
+    searchable(manifest).map((catalog) => searchCatalog(plugin, catalog, query, label)),
   )
 }
 

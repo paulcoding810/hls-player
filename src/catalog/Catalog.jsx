@@ -1,16 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
+import CatalogPicker from '@components/CatalogPicker'
 import MovieDetails from '@components/MovieDetails'
 import SearchResults from '@components/SearchResults'
 import Toast from '@components/Toast'
 import { FilmIcon, LibraryIcon, SearchIcon, SettingsIcon } from '@components/icons'
-import {
-  buttonClass,
-  ghostButtonClass,
-  iconButtonClass,
-  inputClass,
-  selectClass,
-} from '@components/ui'
+import { buttonClass, ghostButtonClass, iconButtonClass, inputClass } from '@components/ui'
 import { HOME_PATH } from '@/helper/constants'
 import { addMovie, EMPTY_LIBRARY, getLibrary, movieToJson, resumeEpisodeId } from '@/helper/library'
 import { openOptions, openPlayer } from '@/helper/player'
@@ -20,32 +15,72 @@ import {
   fetchStremioDetails,
   fetchStremioEpisodes,
   listCatalogs,
+  searchCatalog,
 } from '@/helper/stremio'
 
 /** What a catalog hands back in one go; the next page starts after it. */
 const PAGE = 100
 
-/** `pluginId:catalogType:catalogId`, so one `<select>` can name both. */
+/** `pluginId:catalogType:catalogId`, naming a catalog across every addon. */
 const catalogKey = (plugin, catalog) => `${plugin.id}:${catalog.type}:${catalog.id}`
 
+/** The ticked catalogs, kept on this device only — a convenience, not data worth a backup. */
+const SCOPE_KEY = 'sources.catalogs'
+
+function readScope() {
+  try {
+    const keys = JSON.parse(localStorage.getItem(SCOPE_KEY))
+    return Array.isArray(keys) ? keys.filter((key) => typeof key === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeScope(keys) {
+  try {
+    localStorage.setItem(SCOPE_KEY, JSON.stringify(keys))
+  } catch {
+    // Storage blocked: the scope just resets next time.
+  }
+}
+
 /**
- * Sources, rather than the library: search every enabled addon at once, or
- * browse one of their catalogs. Adding from here lands in the library, which
+ * Sources, rather than the library: search the ticked catalogs — every enabled
+ * addon's when none is — and browse the one ticked alone. Adding from here lands in the library, which
  * is what `home.html` shows.
  */
+/** The line under the search row: what a search covers, and what it skips. */
+function scopeHelp(ticked, skipped, unsearchable) {
+  if (unsearchable) {
+    return ticked.length === 1
+      ? 'This catalog can only be browsed — the addon offers no search for it.'
+      : 'None of these catalogs can be searched — the addons offer no search for them.'
+  }
+  if (skipped.length) {
+    const names = skipped.map((entry) => entry.catalog.name).join(', ')
+    return `Search skips ${names}, which can only be browsed.`
+  }
+  if (ticked.length === 1) return 'Searching this catalog only. Clear the box to browse it again.'
+  if (ticked.length > 1) return `Searching ${ticked.length} catalogs.`
+  return 'Tick catalogs to search only those, or one to browse it.'
+}
+
 export default function Catalog() {
   const [plugins, setPlugins] = useState([])
   const [library, setLibrary] = useState(EMPTY_LIBRARY)
   const [notice, setNotice] = useState(null)
 
   const [query, setQuery] = useState('')
-  /** Null until a search has run; then one group per enabled source. */
+  /** Null until a search has run, and again once the box is cleared; then one group per catalog. */
   const [groups, setGroups] = useState(null)
   const [searching, setSearching] = useState(false)
 
   /** Every catalog every enabled source publishes, flattened for the picker. */
   const [catalogs, setCatalogs] = useState([])
-  const [chosen, setChosen] = useState('')
+  /** Keys of the ticked catalogs; empty is every catalog. */
+  const [chosen, setChosen] = useState([])
+  /** Bumped by every change of scope, so a listing that lands late is dropped. */
+  const listing = useRef(0)
   const [browsing, setBrowsing] = useState(false)
   const [results, setResults] = useState([])
   /** Null once a page comes back short — there is nothing further to ask for. */
@@ -66,7 +101,11 @@ export default function Catalog() {
       const lists = await Promise.all(
         enabled.map(async (plugin) => {
           try {
-            return (await listCatalogs(plugin)).map((catalog) => ({ plugin, catalog }))
+            return (await listCatalogs(plugin)).map((catalog) => ({
+              key: catalogKey(plugin, catalog),
+              plugin,
+              catalog,
+            }))
           } catch {
             // A source whose manifest will not load simply offers no catalogs;
             // searching it will report the failure in its own group.
@@ -74,7 +113,12 @@ export default function Catalog() {
           }
         }),
       )
-      setCatalogs(lists.flat())
+      const found = lists.flat()
+      setCatalogs(found)
+      // A catalog since removed, or its addon disabled, drops out of the scope.
+      const kept = readScope().filter((key) => found.some((entry) => entry.key === key))
+      setChosen(kept)
+      if (kept.length === 1) browse(found.find((entry) => entry.key === kept[0]))
     })()
   }, [])
 
@@ -89,7 +133,12 @@ export default function Catalog() {
     [library.movies],
   )
 
-  const picked = catalogs.find((entry) => catalogKey(entry.plugin, entry.catalog) === chosen)
+  const ticked = catalogs.filter((entry) => chosen.includes(entry.key))
+  /** The one catalog browsed, when exactly one is ticked. */
+  const picked = ticked.length === 1 ? ticked[0] : null
+  /** Ticked catalogs without a `search` extra can only be browsed, so a search skips them. */
+  const skipped = ticked.filter((entry) => !entry.catalog.searchable)
+  const unsearchable = ticked.length > 0 && skipped.length === ticked.length
 
   /** In a tab of its own, so the search results stay where they were. */
   const play = (movieId, episodeId) => {
@@ -99,30 +148,47 @@ export default function Catalog() {
   const runSearch = async (event) => {
     event.preventDefault()
     const term = query.trim()
-    if (!term) return
+    if (!term || unsearchable) return
 
     setNotice(null)
     setSearching(true)
     try {
-      setGroups(await searchAll(plugins, term))
+      setGroups(
+        ticked.length
+          ? await Promise.all(
+              ticked
+                .filter((entry) => entry.catalog.searchable)
+                .map(async ({ plugin, catalog }) => ({
+                  plugin,
+                  ...(await searchCatalog(plugin, catalog, term)),
+                })),
+            )
+          : await searchAll(plugins, term),
+      )
     } finally {
       setSearching(false)
     }
   }
 
-  const openCatalog = async (key) => {
-    setChosen(key)
+  const choose = (keys) => {
+    setChosen(keys)
+    writeScope(keys)
     setGroups(null)
     setResults([])
     setSkip(0)
+    listing.current += 1
+    if (keys.length === 1) browse(catalogs.find((entry) => entry.key === keys[0]))
+  }
 
-    const entry = catalogs.find((item) => catalogKey(item.plugin, item.catalog) === key)
+  async function browse(entry) {
     if (!entry) return
+    const generation = listing.current
 
     setBrowsing(true)
     setNotice(null)
     try {
       const page = await browseCatalog(entry.plugin, entry.catalog)
+      if (generation !== listing.current) return
       setResults(page)
       // Only a catalog that says it pages can be asked for more, and only when
       // this page was full — a short one is already the end.
@@ -137,10 +203,12 @@ export default function Catalog() {
 
   const loadMore = async () => {
     if (!picked || skip === null) return
+    const generation = listing.current
 
     setBrowsing(true)
     try {
       const page = await browseCatalog(picked.plugin, picked.catalog, skip)
+      if (generation !== listing.current) return
       const seen = new Set(results.map((result) => result.id))
       const fresh = page.filter((result) => !seen.has(result.id))
 
@@ -274,37 +342,31 @@ export default function Catalog() {
             <input
               type="search"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search every enabled source…"
+              onChange={(event) => {
+                setQuery(event.target.value)
+                // Clearing the box goes back to the picked catalog's listing.
+                if (!event.target.value) setGroups(null)
+              }}
+              placeholder="godzilla"
               aria-label="Search your sources"
+              disabled={unsearchable}
               className={inputClass}
             />
-            <button type="submit" disabled={!query.trim()} className={ghostButtonClass}>
+            {catalogs.length > 0 && (
+              <CatalogPicker catalogs={catalogs} chosen={chosen} onChange={choose} />
+            )}
+            <button
+              type="submit"
+              disabled={!query.trim() || unsearchable}
+              className={ghostButtonClass}
+            >
               <SearchIcon className="h-3.5 w-3.5" />
               Search
             </button>
           </form>
-
-          {catalogs.length > 0 && (
-            <div className="mb-6 flex items-center gap-2">
-              <label className="text-ink-faint text-xs" htmlFor="catalog">
-                Or browse
-              </label>
-              <select
-                id="catalog"
-                value={chosen}
-                onChange={(event) => openCatalog(event.target.value)}
-                className={selectClass}
-              >
-                <option value="">Pick a catalog…</option>
-                {catalogs.map(({ plugin, catalog }) => (
-                  <option key={catalogKey(plugin, catalog)} value={catalogKey(plugin, catalog)}>
-                    {plugin.name} · {catalog.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <p className="text-ink-faint -mt-2 mb-6 text-xs">
+            {scopeHelp(ticked, skipped, unsearchable)}
+          </p>
 
           <Toast notice={notice} onDismiss={() => setNotice(null)} />
 
@@ -368,7 +430,9 @@ export default function Catalog() {
             </div>
           ) : (
             <p className="text-ink-faint text-sm">
-              Search your sources, or pick a catalog to browse.
+              {ticked.length > 1
+                ? 'Search these catalogs, or tick just one to browse it.'
+                : 'Search every source, or tick a catalog to browse it.'}
             </p>
           )}
         </>
