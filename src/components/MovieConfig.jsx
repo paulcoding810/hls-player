@@ -87,6 +87,26 @@ export default function MovieConfig({ movie, defaults, onChange, idPrefix = 'mov
       </p>
 
       <div>
+        <label className={labelClass} htmlFor={`${idPrefix}-intro-length`}>
+          Intro length
+        </label>
+        <input
+          id={`${idPrefix}-intro-length`}
+          className={inputClass}
+          type="number"
+          min="0"
+          step="1"
+          placeholder={String(defaults.introLength ?? 0)}
+          value={movie.introLength ?? ''}
+          onChange={(event) => onChange({ introLength: number(event.target.value) })}
+        />
+        <p className={helpClass}>
+          For an intro that starts at a different point in each episode: Skip intro, or s, jumps
+          this many seconds ahead during the first 10 minutes.
+        </p>
+      </div>
+
+      <div>
         <label className={labelClass} htmlFor={`${idPrefix}-autoskip`}>
           Auto skip
         </label>

@@ -27,6 +27,7 @@ const seed = async () => {
     adPattern: '^/ads/.+\\.ts$',
     skipLeading: 40,
     skipTrailing: 30,
+    introLength: 90,
     autoSkip: false,
     episodes: [
       {
@@ -256,6 +257,7 @@ describe('sanitizeSettings', () => {
     assert.equal(clean.referer, 'https://x/')
     assert.equal(clean.playbackRate, 1, 'a rate of zero is not playable')
     assert.equal(clean.skipLeading, 0)
+    assert.equal(clean.introLength, 0)
     assert.equal(clean.autoSkip, true)
   })
 })
@@ -270,6 +272,8 @@ describe('inherited skips', () => {
     assert.equal(movie.skipLeading, null)
     assert.equal(movie.skipTrailing, null)
     assert.equal(resolveConfig(movie, { ...DEFAULT_SETTINGS, skipTrailing: 60 }).skipTrailing, 60)
+    assert.equal(movie.introLength, null)
+    assert.equal(resolveConfig(movie, { ...DEFAULT_SETTINGS, introLength: 80 }).introLength, 80)
   })
 
   it('keeps a skip set to 0, which turns it off for the movie', () => {

@@ -44,6 +44,7 @@ import {
 import { leavePlayer, playerUrlForEpisode } from '@/helper/player'
 import { createPreloader, preloadDue } from '@/helper/preload'
 import { clearProgress, getProgress, saveProgress } from '@/helper/progress'
+import { introJumpTarget } from '@/helper/skip'
 import { DEFAULT_SETTINGS, getSettings, sanitizeSettings, saveSettings } from '@/helper/settings'
 import api from '@/utils/api'
 import { hasHostPermission, requestHostPermission } from '@/utils/browser'
@@ -164,6 +165,9 @@ export default function Player() {
   const preloadedRef = useRef(false)
   /** Guards the automatic outro jump against repeat `timeupdate` calls. */
   const skippedRef = useRef(false)
+  /** The intro jump is offered once per episode, so a second press cannot throw the viewer further. */
+  const jumpedRef = useRef(false)
+  const [jumpable, setJumpable] = useState(false)
   /**
    * The longest duration this source has reported. A stream cut short — a
    * network error, an exclusion, a truncated playlist — ends its media source
@@ -359,6 +363,10 @@ export default function Player() {
 
       const duration = longestDuration(instance, durationRef)
       const window = skipAt(time, duration, configRef.current)
+      setJumpable(
+        !jumpedRef.current &&
+          introJumpTarget(time, duration, configRef.current.introLength) !== null,
+      )
       if (
         !preloadedRef.current &&
         preloadDue(time, duration, configRef.current.skipTrailing, PRELOAD_LEAD)
@@ -624,6 +632,8 @@ export default function Player() {
       srcRef.current = episodeKey(source)
       savedAtRef.current = 0
       skippedRef.current = false
+      jumpedRef.current = false
+      setJumpable(false)
       preloadedRef.current = false
       chosenTrackRef.current = false
       durationRef.current = 0
@@ -967,6 +977,20 @@ export default function Player() {
 
   const skipOutro = useCallback(() => advanceRef.current(), [])
 
+  const jumpIntro = useCallback(() => {
+    const instance = playerRef.current
+    if (!instance || jumpedRef.current) return
+    const target = introJumpTarget(
+      instance.currentTime(),
+      longestDuration(instance, durationRef),
+      configRef.current.introLength,
+    )
+    if (target === null) return
+    jumpedRef.current = true
+    setJumpable(false)
+    instance.currentTime(target)
+  }, [])
+
   const hasPrevious = episodeIndex > 0
   const hasNext = episodeIndex > -1 && episodeIndex + 1 < (movie?.episodes.length ?? 0)
   // On the last episode the outro leads nowhere, so it is not offered.
@@ -1019,6 +1043,12 @@ export default function Player() {
         '>': () => stepRate(1),
         ',': () => stepRate(-1),
         '.': () => stepRate(1),
+        // Whichever skip the overlay offers right now; nothing when it offers none.
+        s: () => {
+          if (skipAction === 'intro') skipIntro()
+          else if (skipAction === 'outro') skipOutro()
+          else if (jumpable) jumpIntro()
+        },
         n: () => hasNext && goToEpisode(movie.episodes[episodeIndex + 1].id),
         p: () => hasPrevious && goToEpisode(movie.episodes[episodeIndex - 1].id),
         // Escape unwinds one layer at a time: the panel first, then the page.
@@ -1057,6 +1087,11 @@ export default function Player() {
     episode,
     goToLibrary,
     stepRate,
+    skipAction,
+    skipIntro,
+    skipOutro,
+    jumpable,
+    jumpIntro,
   ])
 
   const handleLevelChange = (event) => {
@@ -1208,15 +1243,28 @@ export default function Player() {
               </div>
             )}
 
-            {skipAction && (
+            {skipAction ? (
               <button
                 type="button"
                 onClick={skipAction === 'intro' ? skipIntro : skipOutro}
+                title={skipAction === 'intro' ? 'Skip intro (s)' : 'Skip outro (s)'}
                 className={`${overlayButtonClass} absolute right-6 bottom-24 z-20`}
               >
                 <NextIcon />
                 {skipAction === 'intro' ? 'Skip intro' : 'Skip outro'}
               </button>
+            ) : (
+              jumpable && (
+                <button
+                  type="button"
+                  onClick={jumpIntro}
+                  title={`Jump ${config.introLength}s ahead (s)`}
+                  className={`${overlayButtonClass} absolute right-6 bottom-24 z-20`}
+                >
+                  <NextIcon />
+                  Skip intro
+                </button>
+              )
             )}
 
             {/* The bar spans the full width and sits above the panel: resizing it

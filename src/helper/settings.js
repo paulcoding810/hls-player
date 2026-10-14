@@ -31,6 +31,8 @@ export const DEFAULT_SETTINGS = {
   skipLeading: 0,
   /** Seconds before the end at which the next item starts (credits). */
   skipTrailing: 0,
+  /** Seconds the Skip intro jump moves forward, for intros that start later; 0 offers none. */
+  introLength: 0,
 }
 
 /** A stored value outside its range would mute the player or make `volume()` throw. */
@@ -65,6 +67,7 @@ export function sanitizeSettings(settings) {
     playbackRate: Number(settings.playbackRate) > 0 ? Number(settings.playbackRate) : 1,
     skipLeading: toSeconds(settings.skipLeading),
     skipTrailing: toSeconds(settings.skipTrailing),
+    introLength: toSeconds(settings.introLength),
   }
 }
 

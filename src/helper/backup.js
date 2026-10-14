@@ -86,6 +86,7 @@ function sanitizeMovie(raw) {
     watchedAt: Number.isFinite(raw.watchedAt) ? raw.watchedAt : null,
     skipLeading: numberOrNull(raw.skipLeading),
     skipTrailing: numberOrNull(raw.skipTrailing),
+    introLength: numberOrNull(raw.introLength),
     autoSkip: typeof raw.autoSkip === 'boolean' ? raw.autoSkip : null,
     ...(lastEpisodeId ? { lastEpisodeId } : {}),
     episodes,

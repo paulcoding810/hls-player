@@ -145,7 +145,7 @@ one the library stores, so a movie copied out of an export file pastes in unchan
 
 Only `title` and `episodes` are required, and an episode may be a bare URL string or an object
 (`url` works in place of `src`). Everything else — `poster`, `referer`, `adPattern`, `skipLeading`,
-`skipTrailing`, `autoSkip` — is optional and left blank inherits the global default, exactly as the
+`skipTrailing`, `introLength`, `autoSkip` — is optional and left blank inherits the global default, exactly as the
 form does. A bad field is reported by name rather than silently dropped.
 
 ## Sources
@@ -264,6 +264,7 @@ on the first move.
 | `c`           | subtitles on / off                        |
 | `,` / `.`     | slower / faster                           |
 | `f`           | fullscreen                                |
+| `s`           | whichever skip button is showing          |
 | `p` / `n`     | previous / next episode                   |
 | `esc`         | close the panel, else back to the library |
 
@@ -381,6 +382,7 @@ defaults, which live on the options page:
 | Referer          | sent with every request for that stream               | yes       |
 | Skip intro       | length of the intro window at the start of an episode | yes       |
 | Skip outro       | length of the outro window before the end             | yes       |
+| Intro length     | how far Skip intro jumps for an intro that moves      | yes       |
 | Auto skip        | jump those windows without asking, on by default      | yes       |
 | Speed            | playback rate applied to every episode                | no        |
 | Autoplay / muted | how playback begins (browsers block unmuted autoplay) | no        |
@@ -395,6 +397,13 @@ the last 30, and neither acts until clicked.
 
 A movie can override it — its **Auto skip** is `Default`, `On` or `Off`, so a series whose intro
 you would rather see can offer the button while everything else jumps automatically.
+
+Some shows open on a scene and play the intro a minute or two in, at a different point each
+episode, so no window fits. For those, set **Intro length** instead (90, say): for the first 10
+minutes of every episode a **Skip intro** button offers to jump that many seconds ahead of wherever
+you are, so press it, or `s`, as the theme starts. It is offered once per episode, never jumps past
+the end, and stays out of the way while a fixed intro window's own button is showing. Nothing knows
+where such an intro starts, so it is never auto-skipped.
 
 Either way the windows are ignored for live streams, where the duration is not finite, and the
 outro is neither jumped nor offered on the last episode — there is nothing to skip to, so it plays

@@ -161,7 +161,10 @@ Skipping an intro or outro is driven by the movie config: `skipAt()` in `src/pla
 returns which window the position falls in, and the global `autoSkip` setting decides whether the
 player jumps it or offers an overlay button. An auto-skipped intro is taken at once, but the outro
 runs an `OUTRO_COUNTDOWN` counter first that the viewer can decline; it is held while paused and
-cleared when the position leaves the window, so it cannot fire on a rewatch. Both windows are
+cleared when the position leaves the window, so it cannot fire on a rewatch. `introLength` is the
+other intro, one that starts somewhere different each episode: `introJumpTarget()` in
+`src/helper/skip.js` offers a jump of that length from the current position during the first
+`INTRO_JUMP_WINDOW` seconds, once per episode, and never automatically. Both windows are
 measured against `longestDuration()`, not `duration()`: a stream cut short ends its media source at
 whatever was buffered, and the shrunken duration would drag the outro window into the middle of the
 episode. For the same reason `ended` only advances when the position actually reached the end. The player page holds no _per-movie_ settings UI beyond the movie form, and the only global ones it

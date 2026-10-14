@@ -88,6 +88,7 @@ export default function MovieFields({
       adPattern: draft.adPattern.trim(),
       skipLeading: draft.skipLeading,
       skipTrailing: draft.skipTrailing,
+      introLength: draft.introLength,
       autoSkip: draft.autoSkip ?? null,
       // Absent means "leave them as they are"; only the source changes them.
       ...(fromSource ? {} : { episodes }),

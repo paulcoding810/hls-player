@@ -56,6 +56,7 @@ describe('parseMovieJson', () => {
     assert.equal(movie.referer, '')
     assert.equal(movie.adPattern, '')
     assert.equal(movie.skipLeading, null)
+    assert.equal(movie.introLength, null)
     assert.equal(movie.autoSkip, null)
   })
 
@@ -66,6 +67,7 @@ describe('parseMovieJson', () => {
         referer: 'example.com',
         skipLeading: '40',
         skipTrailing: 30.6,
+        introLength: '85',
         autoSkip: false,
         episodes: [
           'https://x.test/1.m3u8',
@@ -78,6 +80,7 @@ describe('parseMovieJson', () => {
     assert.equal(movie.referer, 'https://example.com/', 'a bare domain is normalised')
     assert.equal(movie.skipLeading, 40, 'a numeric string is coerced')
     assert.equal(movie.skipTrailing, 31, 'fractional seconds round')
+    assert.equal(movie.introLength, 85)
     assert.equal(movie.autoSkip, false, 'false is kept, not flattened to null')
     assert.equal(movie.episodes[2].src, 'https://x.test/3.m3u8', '`url` aliases `src`')
     assert.equal(movie.episodes[1].title, 'Two')

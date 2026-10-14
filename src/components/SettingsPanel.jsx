@@ -93,6 +93,25 @@ export default function SettingsPanel({ settings, onChange }) {
         {settings.skipTrailing || 0}s before the end. Both are ignored for live streams.
       </p>
 
+      <div>
+        <label className={labelClass} htmlFor="intro-length">
+          Intro length
+        </label>
+        <input
+          id="intro-length"
+          className={inputClass}
+          type="number"
+          min="0"
+          step="1"
+          value={settings.introLength}
+          onChange={(event) => onChange({ introLength: event.target.value })}
+        />
+        <p className={helpClass}>
+          For intros that start at a different point in each episode: Skip intro, or s, jumps this
+          many seconds ahead during the first 10 minutes. 0 turns it off.
+        </p>
+      </div>
+
       <label className={checkboxRowClass}>
         <input
           type="checkbox"

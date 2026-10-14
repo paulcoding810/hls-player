@@ -6,7 +6,7 @@ import { normalizeReferer, normalizeSource } from '@/utils/url'
 
 /**
  * A movie owns its episodes and the config they play with. `referer: ''` and
- * `skipLeading/skipTrailing: null` mean "inherit the global setting".
+ * `skipLeading/skipTrailing/introLength: null` mean "inherit the global setting".
  */
 export const EMPTY_LIBRARY = { movies: [], lastPlayed: null }
 
@@ -21,6 +21,8 @@ export const EMPTY_MOVIE = {
   watchedAt: null,
   skipLeading: null,
   skipTrailing: null,
+  /** Seconds the Skip intro jump moves forward, for an intro that does not start at 0. */
+  introLength: null,
   autoSkip: null,
 }
 
@@ -160,6 +162,7 @@ export function parseMovieJson(text) {
     adPattern,
     skipLeading: optionalNumber(raw.skipLeading, 'skipLeading'),
     skipTrailing: optionalNumber(raw.skipTrailing, 'skipTrailing'),
+    introLength: optionalNumber(raw.introLength, 'introLength'),
     autoSkip: raw.autoSkip ?? null,
     episodes,
   }
@@ -181,6 +184,7 @@ export function movieToJson(movie) {
       adPattern: optional(movie.adPattern),
       skipLeading: optional(movie.skipLeading),
       skipTrailing: optional(movie.skipTrailing),
+      introLength: optional(movie.introLength),
       autoSkip: optional(movie.autoSkip),
       episodes: (movie.episodes ?? []).map(({ title, src, stream, subtitles }) => ({
         title,
@@ -371,6 +375,7 @@ export function resolveConfig(movie, settings) {
     adPattern: movie?.adPattern || settings.adPattern,
     skipLeading: movie?.skipLeading ?? settings.skipLeading,
     skipTrailing: movie?.skipTrailing ?? settings.skipTrailing,
+    introLength: movie?.introLength ?? settings.introLength,
     autoSkip: movie?.autoSkip ?? settings.autoSkip,
     playbackRate: settings.playbackRate,
     autoplay: settings.autoplay,
