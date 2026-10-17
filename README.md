@@ -145,7 +145,7 @@ one the library stores, so a movie copied out of an export file pastes in unchan
 
 Only `title` and `episodes` are required, and an episode may be a bare URL string or an object
 (`url` works in place of `src`). Everything else — `poster`, `referer`, `adPattern`, `skipLeading`,
-`skipTrailing`, `introLength`, `autoSkip` — is optional and left blank inherits the global default, exactly as the
+`skipTrailing`, `introLength`, `subtitleLang`, `autoSkip` — is optional and left blank inherits the global default, exactly as the
 form does. A bad field is reported by name rather than silently dropped.
 
 ## Sources
@@ -377,15 +377,16 @@ was played last — that pair is what the player opens with.
 Per-movie config is edited in the movie form on the library page and wins over the global
 defaults, which live on the options page:
 
-| Setting          | Effect                                                | Per movie |
-| ---------------- | ----------------------------------------------------- | --------- |
-| Referer          | sent with every request for that stream               | yes       |
-| Skip intro       | length of the intro window at the start of an episode | yes       |
-| Skip outro       | length of the outro window before the end             | yes       |
-| Intro length     | how far Skip intro jumps for an intro that moves      | yes       |
-| Auto skip        | jump those windows without asking, on by default      | yes       |
-| Speed            | playback rate applied to every episode                | no        |
-| Autoplay / muted | how playback begins (browsers block unmuted autoplay) | no        |
+| Setting           | Effect                                                     | Per movie |
+| ----------------- | ---------------------------------------------------------- | --------- |
+| Referer           | sent with every request for that stream                    | yes       |
+| Skip intro        | length of the intro window at the start of an episode      | yes       |
+| Skip outro        | length of the outro window before the end                  | yes       |
+| Intro length      | how far Skip intro jumps for an intro that moves           | yes       |
+| Subtitle language | the track turned on first, e.g. `vi` for a Vietnamese show | yes       |
+| Auto skip         | jump those windows without asking, on by default           | yes       |
+| Speed             | playback rate applied to every episode                     | no        |
+| Autoplay / muted  | how playback begins (browsers block unmuted autoplay)      | no        |
 
 With **Auto skip** on (the default), _skip intro_ at 40 starts each episode at 0:40, and _skip
 outro_ at 30 offers to move on 30 seconds before the end. The outro is not taken at once: a

@@ -892,7 +892,7 @@ export default function Player() {
         return
       }
 
-      const { track: pick, settled } = preferredTrack(tracks, globals.subtitleLang)
+      const { track: pick, settled } = preferredTrack(tracks, config.subtitleLang)
       if (pick !== chosen) {
         tracks.forEach((track) => {
           track.mode = track === pick ? 'showing' : 'disabled'
@@ -922,7 +922,7 @@ export default function Player() {
       list.removeEventListener('addtrack', soon)
       player.off('loadedmetadata', soon)
     }
-  }, [player, globals.subtitlesOn, globals.subtitleLang, current])
+  }, [player, globals.subtitlesOn, config.subtitleLang, current])
 
   /** The rate is remembered globally, so it outlives this episode. */
   const setRate = useCallback(

@@ -107,6 +107,24 @@ export default function MovieConfig({ movie, defaults, onChange, idPrefix = 'mov
       </div>
 
       <div>
+        <label className={labelClass} htmlFor={`${idPrefix}-subtitle-lang`}>
+          Subtitle language
+        </label>
+        <input
+          id={`${idPrefix}-subtitle-lang`}
+          className={inputClass}
+          spellCheck="false"
+          placeholder={defaults.subtitleLang || 'en'}
+          value={movie.subtitleLang ?? ''}
+          onChange={(event) => onChange({ subtitleLang: event.target.value })}
+        />
+        <p className={helpClass}>
+          The track turned on first, matched on the start of its language, so <code>vi</code> finds{' '}
+          <code>vi-VN</code>. Blank uses the default.
+        </p>
+      </div>
+
+      <div>
         <label className={labelClass} htmlFor={`${idPrefix}-autoskip`}>
           Auto skip
         </label>

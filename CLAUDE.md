@@ -169,8 +169,9 @@ measured against `longestDuration()`, not `duration()`: a stream cut short ends 
 whatever was buffered, and the shrunken duration would drag the outro window into the middle of the
 episode. For the same reason `ended` only advances when the position actually reached the end. The player page holds no _per-movie_ settings UI beyond the movie form, and the only global ones it
 exposes are subtitle size and the shaded box, from a popover in the control bar — the rest live on
-the options page. Subtitle settings are global only: they are read from `sanitizeSettings(settings)`
-directly rather than through `resolveConfig`, which is the set a movie may override.
+the options page. Subtitle settings are global and read from `sanitizeSettings(settings)` directly, except the
+preferred language: a movie may override `subtitleLang`, so it goes through `resolveConfig`, the
+set a movie may override.
 the movie form itself (`MovieFields.jsx`) renders both as a modal on the library page and inline in
 the player's side panel.
 

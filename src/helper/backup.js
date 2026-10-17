@@ -82,6 +82,7 @@ function sanitizeMovie(raw) {
     poster: string(raw.poster),
     referer: string(raw.referer),
     adPattern: string(raw.adPattern),
+    subtitleLang: string(raw.subtitleLang).trim().toLowerCase(),
     source: readSource(raw.source),
     watchedAt: Number.isFinite(raw.watchedAt) ? raw.watchedAt : null,
     skipLeading: numberOrNull(raw.skipLeading),

@@ -5,8 +5,9 @@ import { readSubtitles } from '@/utils/subtitles'
 import { normalizeReferer, normalizeSource } from '@/utils/url'
 
 /**
- * A movie owns its episodes and the config they play with. `referer: ''` and
- * `skipLeading/skipTrailing/introLength: null` mean "inherit the global setting".
+ * A movie owns its episodes and the config they play with. `referer: ''`,
+ * `subtitleLang: ''` and `skipLeading/skipTrailing/introLength: null` mean
+ * "inherit the global setting".
  */
 export const EMPTY_LIBRARY = { movies: [], lastPlayed: null }
 
@@ -15,6 +16,8 @@ export const EMPTY_MOVIE = {
   poster: '',
   referer: '',
   adPattern: '',
+  /** The subtitle language this movie prefers, matched like the global one; '' inherits it. */
+  subtitleLang: '',
   /** `{ pluginId, itemId }` when a source plugin added it, else null. */
   source: null,
   /** When it was marked finished; playing it again clears this. */
@@ -160,6 +163,7 @@ export function parseMovieJson(text) {
     poster: typeof raw.poster === 'string' ? raw.poster.trim() : '',
     referer: normalizeReferer(raw.referer),
     adPattern,
+    subtitleLang: typeof raw.subtitleLang === 'string' ? raw.subtitleLang.trim().toLowerCase() : '',
     skipLeading: optionalNumber(raw.skipLeading, 'skipLeading'),
     skipTrailing: optionalNumber(raw.skipTrailing, 'skipTrailing'),
     introLength: optionalNumber(raw.introLength, 'introLength'),
@@ -182,6 +186,7 @@ export function movieToJson(movie) {
       poster: optional(movie.poster),
       referer: optional(movie.referer),
       adPattern: optional(movie.adPattern),
+      subtitleLang: optional(movie.subtitleLang),
       skipLeading: optional(movie.skipLeading),
       skipTrailing: optional(movie.skipTrailing),
       introLength: optional(movie.introLength),
@@ -373,6 +378,7 @@ export function resolveConfig(movie, settings) {
   return {
     referer: movie?.referer || settings.referer,
     adPattern: movie?.adPattern || settings.adPattern,
+    subtitleLang: movie?.subtitleLang || settings.subtitleLang,
     skipLeading: movie?.skipLeading ?? settings.skipLeading,
     skipTrailing: movie?.skipTrailing ?? settings.skipTrailing,
     introLength: movie?.introLength ?? settings.introLength,

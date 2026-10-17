@@ -28,6 +28,7 @@ const seed = async () => {
     skipLeading: 40,
     skipTrailing: 30,
     introLength: 90,
+    subtitleLang: 'vi',
     autoSkip: false,
     episodes: [
       {
@@ -239,9 +240,10 @@ describe('sanitizeSettings', () => {
 
   it('keeps the subtitle settings out of the per-movie config', () => {
     // `resolveConfig` is the set of fields a movie may override. Subtitles are
-    // global only, so the player reads them from the settings directly.
+    // global, so the player reads them from the settings directly — all but the
+    // preferred language, which a movie may set.
     const config = resolveConfig(null, { ...DEFAULT_SETTINGS, subtitleSize: 1.25 })
-    for (const key of ['subtitlesOn', 'subtitleLang', 'subtitleSize', 'subtitleBackground']) {
+    for (const key of ['subtitlesOn', 'subtitleSize', 'subtitleBackground']) {
       assert.ok(!(key in config), `${key} should not be a per-movie field`)
     }
   })

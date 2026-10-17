@@ -68,6 +68,7 @@ describe('parseMovieJson', () => {
         skipLeading: '40',
         skipTrailing: 30.6,
         introLength: '85',
+        subtitleLang: ' VI ',
         autoSkip: false,
         episodes: [
           'https://x.test/1.m3u8',
@@ -81,6 +82,7 @@ describe('parseMovieJson', () => {
     assert.equal(movie.skipLeading, 40, 'a numeric string is coerced')
     assert.equal(movie.skipTrailing, 31, 'fractional seconds round')
     assert.equal(movie.introLength, 85)
+    assert.equal(movie.subtitleLang, 'vi', 'trimmed and lower-cased like the global one')
     assert.equal(movie.autoSkip, false, 'false is kept, not flattened to null')
     assert.equal(movie.episodes[2].src, 'https://x.test/3.m3u8', '`url` aliases `src`')
     assert.equal(movie.episodes[1].title, 'Two')
@@ -318,6 +320,12 @@ describe('resolveConfig', () => {
     assert.equal(config.referer, 'https://global/', 'blank inherits')
     assert.equal(config.adPattern, 'own', 'set overrides')
     assert.equal(config.skipLeading, 0, 'zero is a value, not a blank')
+  })
+
+  it("takes the movie's subtitle language over the global one", () => {
+    const settings = { ...DEFAULT_SETTINGS, subtitleLang: 'en' }
+    assert.equal(resolveConfig({ subtitleLang: 'vi' }, settings).subtitleLang, 'vi')
+    assert.equal(resolveConfig({ subtitleLang: '' }, settings).subtitleLang, 'en', 'blank inherits')
   })
 
   it('falls back entirely for a grabbed link with no movie', () => {

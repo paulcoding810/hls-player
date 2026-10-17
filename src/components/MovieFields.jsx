@@ -86,6 +86,7 @@ export default function MovieFields({
       poster: draft.poster.trim(),
       referer: normalizeReferer(draft.referer),
       adPattern: draft.adPattern.trim(),
+      subtitleLang: (draft.subtitleLang ?? '').trim().toLowerCase(),
       skipLeading: draft.skipLeading,
       skipTrailing: draft.skipTrailing,
       introLength: draft.introLength,
