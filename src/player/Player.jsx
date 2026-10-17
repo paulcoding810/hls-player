@@ -357,7 +357,11 @@ export default function Player() {
     instance.on('timeupdate', () => {
       const time = instance.currentTime()
       if (time > 0) positionRef.current = time
-      if (srcRef.current && Math.abs(time - savedAtRef.current) >= PROGRESS_INTERVAL) {
+      if (
+        srcRef.current &&
+        !holdRef.current &&
+        Math.abs(time - savedAtRef.current) >= PROGRESS_INTERVAL
+      ) {
         savedAtRef.current = time
         saveProgress(srcRef.current, time, instance.duration())
       }
@@ -534,7 +538,13 @@ export default function Player() {
   )
 
   /** Seeking before metadata lands does not stick, so it waits when needed. */
-  const startAt = useCallback((time) => {
+  /**
+   * `afterLoad` waits for the next `loadedmetadata` whatever `readyState()`
+   * says: video.js applies a new `src()` a tick later, so until then it still
+   * reports the outgoing stream as loaded, and seeking at once would land on
+   * that one while the new stream starts from zero.
+   */
+  const startAt = useCallback((time, { afterLoad = false } = {}) => {
     const instance = playerRef.current
     if (!instance) return
 
@@ -545,7 +555,7 @@ export default function Player() {
       instance.play()?.catch(() => {})
     }
 
-    if (instance.readyState() >= 1) apply()
+    if (!afterLoad && instance.readyState() >= 1) apply()
     else instance.one('loadedmetadata', apply)
   }, [])
 
@@ -560,6 +570,9 @@ export default function Player() {
       const { muted, playbackRate, volume } = configRef.current
       // Every stream brings its own tracks, so the choice is made again.
       chosenTrackRef.current = false
+      // Held until the seek lands: neither the intro skip nor a progress save
+      // may act on the new stream's zero first.
+      if (at != null) holdRef.current = true
       instance.src({ src: found.url, type: manifestMime(found.url) })
       loadSubtitles(instance, [...(source.subtitles ?? []), ...found.subtitles])
       instance.volume(volume)
@@ -567,7 +580,7 @@ export default function Player() {
       instance.playbackRate(playbackRate)
       setCurrent(found.url)
 
-      if (at != null) startAt(at)
+      if (at != null) startAt(at, { afterLoad: true })
     },
     [loadSubtitles, startAt],
   )
