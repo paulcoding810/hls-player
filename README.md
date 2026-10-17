@@ -292,7 +292,10 @@ The options page carries four settings for them:
 | Shaded box behind the text               | off replaces the box with an outline, for a lighter look over bright video                 |
 
 A track is chosen once per episode, so picking a different one from the menu is not undone
-mid-playback.
+mid-playback. A movie can prefer its own language (its **Subtitle language**), and picking a track
+from the menu sets it: choose the Vietnamese track once and the next episode opens with it. Only
+the language is kept — `vi` from `vi-VN` — and only from a pick by hand; turning subtitles off, a
+track with no language, or a link played outside the library leaves it alone.
 
 The cog beside the subtitle menu opens the rest, against the video in front of you:
 

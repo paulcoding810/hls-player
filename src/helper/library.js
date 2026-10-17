@@ -227,6 +227,20 @@ export async function updateMovie(movieId, patch) {
   })
 }
 
+/**
+ * The subtitle language picked in the player, kept as the movie's preference.
+ * Not an edit, so `updatedAt` is left alone, as `setLastPlayed` leaves it.
+ */
+export async function rememberSubtitleLang(movieId, subtitleLang) {
+  const library = await getLibrary()
+  return saveLibrary({
+    ...library,
+    movies: library.movies.map((movie) =>
+      movie.id === movieId ? { ...movie, subtitleLang } : movie,
+    ),
+  })
+}
+
 export async function removeMovie(movieId) {
   const library = await getLibrary()
   return saveLibrary({

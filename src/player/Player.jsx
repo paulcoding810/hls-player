@@ -39,6 +39,7 @@ import {
   resumeEpisodeId,
   setEpisodes,
   setLastPlayed,
+  rememberSubtitleLang,
   updateMovie,
 } from '@/helper/library'
 import { leavePlayer, playerUrlForEpisode } from '@/helper/player'
@@ -51,7 +52,7 @@ import { hasHostPermission, requestHostPermission } from '@/utils/browser'
 import { compilePattern, stripAdSegments } from '@/utils/playlist'
 import { stripDecoyPrefix } from '@/utils/segments'
 import { describePlaybackError } from '@/utils/errors'
-import { preferredTrack, toVtt } from '@/utils/subtitles'
+import { languageTag, preferredTrack, toVtt } from '@/utils/subtitles'
 import { fileNameOf, manifestMime, normalizeSource } from '@/utils/url'
 import './Player.css'
 
@@ -977,6 +978,16 @@ export default function Player() {
 
   const skipOutro = useCallback(() => advanceRef.current(), [])
 
+  /** A track picked by hand becomes the movie's language; a grabbed link has no movie to keep it. */
+  const pickLanguage = useCallback(
+    async (language) => {
+      const tag = languageTag(language)
+      if (!movie || !tag || tag === movie.subtitleLang) return
+      setLibrary(await rememberSubtitleLang(movie.id, tag))
+    },
+    [movie],
+  )
+
   const jumpIntro = useCallback(() => {
     const instance = playerRef.current
     if (!instance || jumpedRef.current) return
@@ -1291,6 +1302,7 @@ export default function Player() {
                   streams={streams}
                   currentStream={current}
                   onChooseStream={chooseStream}
+                  onPickLanguage={pickLanguage}
                   fullscreen={fullscreen}
                   onToggleFullscreen={toggleFullscreen}
                 />

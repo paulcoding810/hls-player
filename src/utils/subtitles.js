@@ -57,6 +57,12 @@ export function readSubtitles(value, normalize) {
     .filter(Boolean)
 }
 
+/** A track's language as a movie remembers it: the part before any region, `vi` from `vi-VN`; '' without one. */
+export function languageTag(language) {
+  const tag = (language ?? '').trim().toLowerCase().split(/[-_]/)[0]
+  return /^[a-z]{2,3}$/.test(tag) ? tag : ''
+}
+
 /**
  * The track to turn on, and whether it settles the choice. A fallback to the
  * first track does not: the preferred language may simply not have arrived yet.

@@ -12,6 +12,7 @@ import {
   markWatched,
   movieToJson,
   parseMovieJson,
+  rememberSubtitleLang,
   resolveConfig,
   resumeEpisodeId,
   setEpisodes,
@@ -214,6 +215,17 @@ describe('sortMovies', () => {
   it('leaves the stored order alone', () => {
     sortMovies(movies, 'title')
     assert.equal(movies.map((m) => m.title).join(' '), 'A C B')
+  })
+})
+
+describe('rememberSubtitleLang', () => {
+  it('keeps the language without counting as an edit', async () => {
+    const movie = await addMovie({ title: 'Show', episodes: [{ src: 'https://x.test/1.m3u8' }] })
+    const library = await rememberSubtitleLang(movie.id, 'vi')
+    const saved = library.movies.find((m) => m.id === movie.id)
+
+    assert.equal(saved.subtitleLang, 'vi')
+    assert.equal(saved.updatedAt, movie.updatedAt, 'the Updated sort order is left alone')
   })
 })
 

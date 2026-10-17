@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
-import { labelFor, preferredTrack, readSubtitles, toVtt } from '@/utils/subtitles'
+import { labelFor, languageTag, preferredTrack, readSubtitles, toVtt } from '@/utils/subtitles'
 import { findPayloadStart, stripDecoyPrefix, PNG_SIGNATURE } from '@/utils/segments'
 import { formatTime } from '@/utils/time'
 import { SUBTITLE_POSITIONS, SUBTITLE_SIZES } from '@/helper/constants'
@@ -199,4 +199,18 @@ describe('formatTime', () => {
   for (const [seconds, expected] of cases) {
     it(`renders ${seconds} as ${expected}`, () => assert.equal(formatTime(seconds), expected))
   }
+})
+
+describe('languageTag', () => {
+  it('keeps the language and drops the region', () => {
+    assert.equal(languageTag('vi-VN'), 'vi')
+    assert.equal(languageTag(' EN_gb '), 'en')
+    assert.equal(languageTag('vie'), 'vie')
+  })
+
+  it('is empty for a track with no usable language', () => {
+    assert.equal(languageTag(''), '')
+    assert.equal(languageTag(undefined), '')
+    assert.equal(languageTag('Vietsub'), '', 'a label is not a language')
+  })
 })

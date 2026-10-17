@@ -99,6 +99,7 @@ export default function Controls({
   streams = [],
   currentStream,
   onChooseStream,
+  onPickLanguage,
   hasPrevious,
   hasNext,
   fullscreen,
@@ -311,6 +312,8 @@ export default function Controls({
     // Picking the second track as the first leaves nothing stacked above it.
     if (id === secondId) setSecondId('off')
     apply(id, id === secondId ? 'off' : secondId)
+    const picked = tracks.find((entry) => entry.id === id)
+    if (picked) onPickLanguage?.(picked.track.language)
   }
 
   /** Rounded to the step, so repeated presses cannot drift off it. */
